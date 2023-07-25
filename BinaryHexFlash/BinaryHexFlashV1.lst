@@ -1,0 +1,341 @@
+                        ; Binary / Hex Flash Card Program
+                        ; AFTER RUNNING, ENTER THE CORRECT HEX VALUE FOR
+                        ; THE DISPLAYED BINARY PATTERN.
+                        ;     + WILL DISPLAY TOTAL CORRECT ANSWERS
+                        ;     - WILL DISPLAY TOTAL INCORRECT ANSWERS
+                        ;     ANSWERS ROLLOVER TO ZERO PAST 99
+                        
+                        ; V 1.0 -- USING WILLIAM COLLEY'S AZ80 ASSEMBLER (LINUX)
+                        ; https://www.retrotechnology.com/restore/az80.html
+                        ; ASSEMBLER HAS .EXE FOR WINDOWS...
+                        ; TO COMPILE AZ80 ASSEMBLER IN LINUX:
+                            ; ln -s az80.H AZ80.h  (or vice versa)
+                            ; gcc -I. -o az80 z80.c z80util.c az80eval.c
+                            ; chmod +x az80 ; allow execution
+                        ; -- RICKY BRYCE
+                        
+                        ; TO SET BAUD RATE IN LINUX FOR FIRST SERIAL DEVICE:
+                        ; stty -F /dev/ttyUSB0 ispeed 4800
+                        ; (ON MINE, I NEED TO DO THIS TWICE FOR SOME REASON)
+                        
+                        ; TO ASSEMBLE, CREATE INTEL HEX FILE, AND UPLOAD ALL AT ONCE, 
+                        ; CREATE EXECUTABLE SHELL CALLED assemble:
+                        ; stty -F /dev/USB0 ispeed 4800 ; we get an error for some reason
+                        ; stty -F /dev/USB0 ispeed 4800 ; so set it again -- 2nd time 
+                                                        ; there is no error.
+                                                        
+                        ; stty -F /dev/USB0  ; show baud rate setting (should be 4800)
+                        ;  ./az80 $1.z80 -l $1.lst -o $1.hex
+                        ;  sleep 1
+                        ;  cat $1.hex > /dev/ttyUSB0
+                        ;  echo "Done..."
+                        
+                        ; AFTER SAVING THE FILE, MAKE IT EXECUTABLE chmod +x assemble
+                        ; TO ASSEMBLE, AND TRANSMIT FILE, TYPE: ./assemble filename
+                        ; Z80 EXTENSION IS ASSUEMED AND NAME IS PASSED TO SHELL FILE AS $1
+                        
+   2000                     ORG $2000       ; START PROGRAM AT $2000
+                        
+                        ; ** BEGIN INTRO **
+   2000                 INTRO:
+   2000   06 ff             LD B,$FF        ; START B AT $FF
+   2002   21 02 00          LD HL,$0002     ; TONE DURATION
+   2005                 INTLOOP:
+   2005   3e 3f             LD A,$3F        ; SET A FOR 6 DISPLAYS AT ONCE
+   2007   d3 85             OUT ($85),A     ; THEN TURN THEM ON
+   2009   78                LD A,B          ; LOAD LOOP VALUE TO A
+   200a   d3 84             OUT ($84),A     ; SEND THIS TO THE DISPLAYS
+   200c   0e 14             LD C,TONE       ; THEN SOUND A TONE FOR THIS VALUE
+   200e   f7                RST SYSTEM
+   200f   10 f4             DJNZ INTLOOP
+                            
+                        ; ** BEGIN INITIALIZE **
+   2011                 INIT:    
+   2011   3e 00             LD A,0 ; ACCUMULATOR
+   2013   11 00 00          LD DE,0 ; USING D FOR KEYPRESSES
+   2016   21 00 00          LD HL,0 ; 16 BIT REGISTER (FOR MEMORY ADDRESSES)
+   2019   01 00 00          LD BC,0 ; USED TO DETERMINE NEXT ANSWER, AND FOR LOOPING
+   201c   32 21 22          LD (CORRECT),A
+   201f   32 22 22          LD (INCORRECT),A
+   2022   32 20 22          LD (ANSWER),A
+   2025   0e 04             LD C,CLRBUF          ; CLEAR DISPLAY BUFFER
+   2027   f7                RST SYSTEM          ; SYSTEM CALL
+   2028   d3 85             OUT ($85),A
+   202a   d3 84             OUT ($84),A
+                        ; ** END INITIALIZE **
+                            
+                        ; ** END INTRO **
+                        
+                        ; ** WAIT FOR KEYPRESS **   
+   202c                 BEGIN:
+   202c   3e 0f             LD A,$0F             ; START A AT MAX POSSIBLE ANSWER
+   202e                 RTIME:
+   202e   47                LD B,A  ; B HOLDS THE NEXT QUESTION (B CREATES A "RANDOM" VALUE)
+   202f   cd d9 20          CALL QDISPLAY       ; DISPLAY THE QUESTION
+   2032   db 86             IN A,($86)          ; GET THE ANSWER FROM USER (KEYPAD PORT)
+   2034   cb 6f             BIT 5,A             ; CHECK KEYPAD STATUS BIT
+   2036   20 08             JR NZ,KEYPRESS      ; IF KEY IS PRESSED, THEN GO CHECK IT.
+   2038   78                LD A,B              ; RELOAD A FROM B
+   2039   3d                DEC A               ; DEC A     
+                        
+   203a   20 f2             JR NZ,RTIME         ; IF A !=0, THEN LOOP 
+   203c   3e 0f             LD A,$0F            ; IF A = 0 THEN RESET A TO $0F
+   203e   18 ee             JR RTIME            ; LOOP
+                            
+   2040                 KEYPRESS:
+   2040   e6 1f             AND $1F             ; MASK OUT UPPER NYBBLE
+   2042   57                LD D,A              ; LOAD D WITH KEYPRESS VALUE
+   2043   f5                PUSH AF             ; BACKUP AF
+   2044   3e 12             LD A,$12            ; LOAD A WITH "PLUS" VALUE
+   2046   ba                CP D                ; SEE IF D IS $12 (+)
+   2047   28 10             JR Z,NUMCORR        ; DISPLAY NUMBER CORRECT
+   2049   3e 13             LD A,$13            ; LOAD A WITH "MINUS" VALUE
+   204b   ba                CP D                ; CHECK IF D IS $13 (-)
+   204c   28 10             JR Z,NUMINCORR      ; DISPLAY NUMBER INCORRECT
+   204e   f1                POP AF              ; RESTORE AF
+   204f   57                LD D,A              ; D AGAIN HAS KEY VALUE
+   2050   21 20 22          LD HL,ANSWER        ; LOAD HL WITH ADDRESS OF ANSWER
+   2053   7e                LD A,(HL)           ; LOAD ANSWER TO A
+   2054   ba                CP D                ; COMPARE ANSWER TO KEYPRESS
+   2055   20 18             JR NZ,WRONG         ; IF IT DOES NOT MATCH, JUMP TO "WRONG" LABEL
+   2057   18 29             JR RIGHT            ; OTHERWISE, JUMP TO RIGHT LABEL
+                        
+   2059                 NUMCORR:                ; BACKUP BC TO STACK
+   2059   3a 21 22          LD A,(CORRECT)      ; LOAD A WITH # CORRECT ANSWERS
+   205c   18 05             JR DBYTE            ; DISPLAY RESULT
+                        
+   205e                 NUMINCORR:              ; BACKUP BC TO STACK
+   205e   3a 22 22          LD A,(INCORRECT)    ; LOAD A WITH # INCORRECT ANSWERS
+   2061   18 00             JR DBYTE            ; DISPLAY RESULT
+                        
+   2063                 DBYTE:
+   2063   0e 03             LD C,DISBYT         ; SEND A TO STARBOARD DISPLAY
+   2065   f7                RST SYSTEM         ; CALL SYSTEM
+   2066   0e 0a             LD C,SKEYRL         ; WAIT FOR KEY RELEASE
+   2068   f7                RST SYSTEM         ; SYSTEM CALL
+   2069   0e 04             LD C,CLRBUF         ; CLEAR DISPLAY BUFFER
+   206b   f7                RST SYSTEM         ; SYSTEM CALL
+   206c   c3 2c 20          JP BEGIN            ; RESTART
+                            
+   206f                 WRONG:
+                        
+   206f   3a 22 22          LD A,(INCORRECT)   ; STORE A TO MEMORY  
+   2072   3c                INC A              ; INCREMENT A
+   2073   cd 99 20          CALL FIXA          ; TEST FOR HEX CHARS
+   2076   32 22 22          LD (INCORRECT),A   ; STORE INCREMENTED VALUE TO MEMORY
+   2079   cd c5 20          CALL BADTONE
+   207c   0e 0a             LD C,SKEYRL         ; WAIT UNTIL KEY RELEASE
+   207e   f7                RST SYSTEM          ; SYSTEM CALL
+   207f   c3 2c 20          JP BEGIN            ; TRY AGAIN
+                            
+   2082                 RIGHT:
+   2082   3a 21 22          LD A,(CORRECT)      ; LOAD A FROM MEMORY    
+   2085   3c                INC A               ; INCREMENT A
+   2086   cd 99 20          CALL FIXA           ; CHECK FOR HEX CHARS
+   2089   32 21 22          LD (CORRECT),A      ; STORE A TO MEMORY
+   208c   cd b1 20          CALL GOODTONE
+   208f   0e 0a             LD C,SKEYRL         ; WAIT UNTIL KEY RELEASE
+   2091   f7                RST SYSTEM
+   2092   21 20 22          LD HL,ANSWER        ; LOAD HL WITH ADDRESS OF ANSWER
+   2095   70                LD (HL),B           ; LOAD NEW VALUE INTO ANSWER
+   2096   c3 2c 20          JP BEGIN            ; RE-RUN
+                            
+   2099                 FIXA: 
+   2099   5f                LD E,A              ; BACKUP A TO E
+   209a   e6 0f             AND $0F             ; MASK OUT UPPER NYBBLE
+   209c   fe 0a             CP $0A              ; CHECK IF LOWER NYBBLE REACHED $0A
+   209e   28 02             JR Z,ADD6           ; IF SO, THEN JUMP TO ADD6
+   20a0   7b                LD A,E              ; RESTORE A 
+   20a1   c9                RET
+   20a2                 ADD6:
+   20a2   7b                LD A,E              ; RESTORE ORIGINAL VALUE OF A
+   20a3   c6 06             ADD A,$06           ; ADD 6
+   20a5   5f                LD E,A              ; BACKUP NEW VALUE TO E
+   20a6   e6 f0             AND $F0             ; MASK OUT LOWER BITS
+   20a8   fe a0             CP $A0              ; SEE IF WE'VE REACHED $A0
+   20aa   28 02             JR Z,ROLLOVER       ; IF SO, THEN ROLLOVER TO ZERO  
+   20ac   7b                LD A,E              ; IF NOT RESTORE A AND RETURN
+   20ad   c9                RET
+   20ae                 ROLLOVER:
+   20ae   3e 00             LD A,0              ; ROLL A OVER TO 0
+   20b0   c9                RET
+                        
+   20b1                 GOODTONE:
+   20b1   e5                PUSH HL
+   20b2   c5                PUSH BC
+   20b3   f5                PUSH AF
+   20b4   21 25 00          LD HL,$0025         ; TONE DURATION
+   20b7   3e 25             LD A,$25
+   20b9   0e 14             LD C,TONE           ; PLAY TONE
+   20bb   f7                RST SYSTEM          ; SYSTEM CALL
+   20bc   3e 15             LD A,$15
+   20be   0e 14             LD C,TONE
+   20c0   f7                RST SYSTEM         ; SYSTEM CALL
+   20c1   f1                POP AF
+   20c2   c1                POP BC
+   20c3   e1                POP HL
+   20c4   c9                RET
+                            
+                            
+   20c5                 BADTONE:
+   20c5   e5                PUSH HL
+   20c6   c5                PUSH BC
+   20c7   f5                PUSH AF
+   20c8   21 25 00          LD HL,$0025         ; TONE DURATION
+   20cb   3e 55             LD A,$55
+   20cd   0e 14             LD C,TONE           ; PLAY TONE
+   20cf   f7                RST SYSTEM          ; SYSTEM CALL
+   20d0   3e 75             LD A,$75
+   20d2   0e 14             LD C,TONE
+   20d4   f7                RST SYSTEM         ; SYSTEM CALL
+   20d5   f1                POP AF
+   20d6   c1                POP BC
+   20d7   e1                POP HL
+   20d8   c9                RET
+                        
+                            
+                            
+   20d9                 QDISPLAY:
+   20d9   3a 20 22          LD A,(ANSWER)       ; LOAD ANSWER TO A
+   20dc   b7                OR A                ; CHECK IF ZERO SAME AS CP 0
+   20dd   2a 00 22          LD HL,(BVALUES)     ; IF SO, LOAD BVALUES ($0000)
+   20e0   28 0e             JR Z, DISPLAYQ      ; CALL DISPLAYQ
+   20e2   21 00 22          LD HL,BVALUES
+                            
+   20e5   c5                PUSH BC             ; STORE BC TO STACK
+   20e6   47                LD B,A              ; LOAD B FROM A
+   20e7                 QUESTIONLOOP:
+   20e7   2c                INC L   ; INCREMENT L TWICE TO ADVANCE THROUGH BVALUES
+   20e8   2c                INC L
+   20e9   10 fc             DJNZ QUESTIONLOOP   ; DECREMENT B AND JUMP, LOOP UNTIL ZERO
+   20eb   c1                POP BC              ; RESTORE BC
+                        
+   20ec   7e                LD A,(HL)  ; LOAD LOW BYTE TO ACCUMULATOR
+   20ed   2c                INC L      ; INCREMENT HL
+   20ee   66                LD H,(HL)  ; LOAD HIGH BYTE TO H
+   20ef   6f                LD L,A     ; LOAD LOW BYTE FROM A BACK TO L
+                            
+                        
+   20f0                 DISPLAYQ:
+   20f0   0e 02             LD C,DISADD ; ADD HL TO DISPLAY BUFFER.  CONVERT TO DISPLAY
+   20f2   f7                RST SYSTEM  ; SYSTEM CALL
+   20f3   0e 05             LD C,SCAND  ; SCAN DISPLAY
+   20f5   f7                RST SYSTEM  ; SYSTEM CALL
+   20f6   c9                RET
+                            
+                            
+   2200                     ORG $2200
+                        ;  ** DEFINE BYTES **
+   2200                 BVALUES:  
+   2200   00 00 01 00       DB $00,$00,$01,$00,$10,$00,$11,$00
+   2204   10 00 11 00   
+   2208   00 01 01 01       DB $00,$01,$01,$01,$10,$01,$11,$01
+   220c   10 01 11 01   
+   2210   00 10 01 10       DB $00,$10,$01,$10,$10,$10,$11,$10
+   2214   10 10 11 10   
+   2218   00 11 01 11       DB $00,$11,$01,$11,$10,$11,$11,$11
+   221c   10 11 11 11   
+   2220                 ANSWER:
+   2220   00                DB $00
+   2221                 CORRECT:
+   2221   00                DB $00
+   2222                 INCORRECT:
+   2222   00                DB $00
+                        
+                        
+                            
+                        ; ** END DEFINE BYTES
+                        ; CREATE LABEL (ALIAS) NAMED SYSTEM FOR MONITOR ENTRY POINT
+   0030                 SYSTEM: EQU $30
+   0038                 BREAK:  EQU $38
+                           
+                        ; Pasted some code out of the monitor definitions file.
+                        ; This is not the whole file.
+                        ; to obtain the file, visit:
+                        ; https://github.com/crsjones/Southern-Cross-Computer-z80/tree/main/SouthernCrossSBC_Monitor/SCMonitorV18
+                        ;--------------------------------------------
+                        ; S O U T H E R N   C R O S S   M O N I T O R
+                        ;--------------------------------------------
+                        ;
+                        ;  MONITOR DEFINITIONS FILE 
+                        ;  Version 1.8
+                        ;
+                        ; WRITTEN BY CRAIG R. S. JONES
+                        ; MELBOURNE, AUSTRALIA.
+                        ;
+                        ;--------------------
+                        ; SYSTEM CALL NUMBERS
+                        ;--------------------
+                        ;
+                        ;  LD   C,SYSTEM CALL NUMBER
+                        ;  RST  30H
+                        ;
+                        
+   0000                 MAIN:	EQU	0	;RESTART MONITOR
+   0001                 VERS:	EQU	1	;RETURNS MONITOR VERSION
+   0002                 DISADD:	EQU	2	;ADDRESS -> DISPLAY BUFFER
+   0003                 DISBYT:	EQU	3	;DATA -> DISPLAY BUFFER
+   0004                 CLRBUF:	EQU	4	;CLEAR DISPLAY BUFFER
+   0005                 SCAND:  EQU	5	;SCAN DISPLAY
+   0006                 CONBYT:	EQU	6	;BYTE -> DISPLAY CODE
+   0007                 CONVHI:	EQU	7	;HI NYBBLE -> DISPLAY CODE
+   0008                 CONVLO:	EQU	8	;LO NYBBLE - > DISPLAY CODE
+   0009                 SKEYIN:	EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+   000a                 SKEYRL:	EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+   000b                 KEYIN:	EQU	11	;WAIT FOR KEY PRESS
+   000c                 KEYREL:	EQU	12	;WAIT FOR KEY RELEASE
+   000d                 MENU:	EQU	13	;SELECT ENTRY FROM MENU
+   000e                 CHKSUM:	EQU	14	;CALCULATE CHECKSUM
+   000f                 MUL16:	EQU	15	;16 BIT MULTIPLY
+   0010                 RAND:	EQU	16	;GENERATE RANDOM NUMBER
+   0011                 INDEXB:	EQU	17	;INDEX INTO BYTE TABLE
+   0012                 INDEXW:	EQU	18	;INDEX INTO WORD TABLE
+   0013                 MUSIC:	EQU	19	;PLAY MUSIC TABLE
+   0014                 TONE:	EQU	20	;PLAY A NOTE
+   0015                 BEEP:	EQU	21	;KEY ENTRY BEEP
+   0016                 SKATE:	EQU	22	;SCAN 8X8 DISPLAY
+   0017                 TXDATA:	EQU	23	;TRANSMIT SERIAL BYTE
+   0018                 RXDATA:	EQU	24	;RECEIVE SERIAL BYTE
+   0019                 ASCHEX:	EQU	25	;ASCII CODE -> HEX
+   001a                 WWATCH:	EQU	26	;WRITE TO SMART WATCH
+   001b                 RWATCH:	EQU	27	;READ FROM SMART WATCH
+   001c                 ONESEC:	EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+   001d                 RLSTEP:	EQU	29	;RELAY SEQUENCER
+   001e                 DELONE:	EQU	30	;ONE SECOND DELAY LOOP
+   001f                 SCANKEY: EQU	31	;SCAN THE KEYBOARD
+   0020                 INTELH:	EQU	32	;RECEIVE INTEL HEX FILE
+   0021                 SPLIT:	EQU	33	;SEPARATE A BYTE INTO NYBBLES
+   0022                 SNDMSG:	EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+   0023                 BITASC:	EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+   0024                 WRDASC:	EQU	36	;CONVERT A WORD TO ASCII
+   0025                 BYTASC:	EQU	37	;CONVERT A BYTE TO ASCII
+   0026                 NYBASC:	EQU	38	;CONVERT A NYBBLE TO ASCII
+   0027                 PCBTYP:	EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+   0028                 PRNTSZ:	EQU	40	;INLINE SERIAL PRINT STRING
+   0029                 KBDTYP:	EQU	41	;RETURNS KEYBOARD TYPE
+   002a                 UPDATE:	EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+   002b                 VARRAM:	EQU	43	;RETURN BASE VARIABLE ADDRESS
+   002c                 SERINI:	EQU	44	;INITIALISE BIT BANG SERIAL PORT
+   002d                 SCBUG:	EQU	45	;SCBUG SERIAL MONITOR
+                        
+                        ;END OF INCLUDE FILE
+   2223                     END
+20a2  ADD6          2220  ANSWER        0019  ASCHEX        20c5  BADTONE   
+0015  BEEP          202c  BEGIN         0023  BITASC        0038  BREAK     
+2200  BVALUES       0025  BYTASC        000e  CHKSUM        0004  CLRBUF    
+0006  CONBYT        0007  CONVHI        0008  CONVLO        2221  CORRECT   
+2063  DBYTE         001e  DELONE        0002  DISADD        0003  DISBYT    
+20f0  DISPLAYQ      2099  FIXA          20b1  GOODTONE      2222  INCORRECT 
+0011  INDEXB        0012  INDEXW        2011  INIT          0020  INTELH    
+2005  INTLOOP       2000  INTRO         0029  KBDTYP        000b  KEYIN     
+2040  KEYPRESS      000c  KEYREL        0000  MAIN          000d  MENU      
+000f  MUL16         0013  MUSIC         2059  NUMCORR       205e  NUMINCORR 
+0026  NYBASC        001c  ONESEC        0027  PCBTYP        0028  PRNTSZ    
+20d9  QDISPLAY      20e7  QUESTIONLOOP    0010  RAND          2082  RIGHT     
+001d  RLSTEP        20ae  ROLLOVER      202e  RTIME         001b  RWATCH    
+0018  RXDATA        0005  SCAND         001f  SCANKEY       002d  SCBUG     
+002c  SERINI        0016  SKATE         0009  SKEYIN        000a  SKEYRL    
+0022  SNDMSG        0021  SPLIT         0030  SYSTEM        0014  TONE      
+0017  TXDATA        002a  UPDATE        002b  VARRAM        0001  VERS      
+0024  WRDASC        206f  WRONG         001a  WWATCH        
+
