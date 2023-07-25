@@ -1,0 +1,267 @@
+                        ; Scoreboard Program
+                        ; I pasted parts of SCM18_Include.asm
+                        ; Assembles using AZ80 Assembler by William C Colley III
+                        
+                        ; + OR - INCREMENTS OR DECREMENTS LEFT PLAYER SCORE
+                        ; B OR F INCREMENTS OR DECREMENTS RIGHT PLAYER SCORE
+                        ; 0 on the keypad will reset the counter to zero.
+                        
+                        ;  -- Ricky Bryce
+                        
+                        
+   2000                     ORG $2000
+                            
+                            
+                        ; ** BEGIN INITIALIZE **    
+   2000                 INIT: ; INITIALIZE REGISTERS AND MEMORY
+                            ; A IS THE 8 BIT ACCUMULATOR. THE AF REGISTER IS A PAIR,
+                            ; BUT NOT USED AS A PAIR BECAUSE F CONTAINS STATUS FLAGS
+                            ; IN OTHER WORDS A AND F ARE USED SEPARATELY AS BYTES
+   2000   3e 00             LD A,0 ; ACCUMULATOR
+   2002   11 00 00          LD DE,0 ; NOT USED HERE (CAN HOLD 16 BIT ADDRESSES)
+   2005   21 00 00          LD HL,0 ; 16 BIT REGISTER (FOR MEMORY ADDRESSES)
+   2008   01 00 00          LD BC,0 ; NOT USED HERE (16 BIT BYTE COUNTER)
+   200b   dd 21 4f 21       LD IX,COUNTER
+   200f   dd 77 00          LD (IX+0),A ; RIGHT PLAYER SCORE
+   2012   dd 77 01          LD (IX+1),A ; LEFT PLAYER SCORE
+   2015   dd 77 02          LD (IX+2),A ; SPARE
+   2018   dd 77 03          LD (IX+3),A ; SPARE
+   201b   32 4d 21          LD (KEYVALUE+0),A
+   201e   32 4e 21          LD (KEYVALUE+1),A
+   2021   0e 04             LD C,CLRBUF             ; CLEAR DISPLAY BUFFER
+   2023   cd 30 00          CALL SYSTEM             ; SYSTEM CALL
+                        ; *** END INITILIALIZE ***
+                        
+                        
+                        ; *** WAIT FOR KEYPRESS ***   
+   2026                 BEGIN:
+   2026   0e 04             LD C,CLRBUF          ;CLEAR DISPLAY BUFFER
+   2028   cd 30 00          CALL SYSTEM          ; SYSTEM CALL
+   202b   2a 4f 21          LD HL,(COUNTER)      ; LOAD HL WITH COUNTER VALUE
+   202e   0e 02             LD C,DISADD          ; ADD VALUE TO DISPLAY BUFFER CONVERTING TO 7 SEGMENT
+   2030   cd 30 00          CALL SYSTEM
+   2033   0e 05             LD C, SCAND          ; SCAN THE DISPLAY
+   2035   cd 30 00          CALL SYSTEM
+   2038   0e 09             LD C, SKEYIN         ; SKEYIN -- SCAN UNTIL KEY PRESSED
+   203a   cd 30 00          CALL SYSTEM          ; SYSTEM CALL
+   203d   32 4d 21          LD (KEYVALUE),A      ; LOAD KEYVALUE WITH ACCUMULATOR (DEFINED AT BOTTOM OF PROGRAM)
+   2040   c3 53 20          JP KEYS
+   2043                 HANDLED:
+   2043   2a 4f 21          LD HL,(COUNTER)     ; LOAD HL WITH KEYVALUE (REQUIRED BY DISADD)
+   2046   0e 02             LD C,DISADD          ; DISADD -- ADD NUMBER TO DISPLAY BUFFER, CONVERTING TO 7 SEGMENT
+   2048   cd 30 00          CALL SYSTEM          ; SYSTEM CALL
+   204b   0e 0a             LD C,SKEYRL          ; SKEYREL -- SCAN UNTIL KEY RELEASED
+   204d   cd 30 00          CALL SYSTEM          ; SYSTEM CALL
+   2050   c3 26 20          JP BEGIN             ; REPEAT
+                            
+                        ; *** END WAIT FOR KEYPRESS *** 
+                        
+                        
+                        ; *** BEGIN HANDLEKEYS ***
+   2053                 KEYS:
+                        
+   2053   3a 4d 21          LD A,(KEYVALUE)     ; LOAD A WITH KEYVALUE MEMORY
+   2056   fe 12             CP $12              ; CHECK FOR +
+   2058   ca 7c 20          JP Z,LEFTPLUS
+   205b   fe 13             CP $13              ; CHECK FOR -
+   205d   ca ab 20          JP Z,LEFTMINUS
+   2060   fe 0b             CP $0B              ; CHECK FOR B (INCRMENT RIGHT COUNTER)
+   2062   ca da 20          JP Z,RIGHTPLUS
+   2065   fe 0f             CP $0F              ; CHECK FOR F (DECREMENT RIGHT COUNTER)
+   2067   ca 09 21          JP Z,RIGHTMINUS
+   206a   fe 00             CP $00              ; CHECK FOR 0 (RESET COUNTS TO ZERO)
+   206c   ca 38 21          JP Z,CLEARCOUNTS
+   206f   0e 15             LD C,BEEP
+   2071   cd 30 00          CALL SYSTEM
+   2074   0e 15             LD C,BEEP
+   2076   cd 30 00          CALL SYSTEM
+   2079   c3 26 20          JP BEGIN
+                            
+   207c                 LEFTPLUS:
+   207c   dd 7e 01          LD A,(IX+1)      ; LOAD ACCUMULATOR WITH LOWER BYTE INTENDED FOR DISPLAY
+   207f   3c                INC A            ; INCREMENT LOWER BYTE
+   2080   dd 77 01          LD (IX+1),A      ; SAVE ACCUMULATOR TO LOWER BYTE
+   2083   e6 0f             AND $0F          ; MASK OUT UPPER NYBBLE
+   2085   fe 0a             CP $0A           ; CHECK FOR > 0
+   2087   c2 43 20          JP NZ,HANDLED    ; IF NOT YET $0A, CONTINUE
+   208a   dd 7e 01          LD A,(IX+1)      ; RELOAD ACCUMULATOR WITH LOWER BYTE
+   208d   c6 06             ADD A,6          ; IF > 9 THEN ADD 6 (COUNT IN DEC)
+   208f   dd 77 01          LD (IX+1),A      ; STORE ACCUMULATOR TO LOWER BYTE
+   2092   e6 f0             AND $F0          ; MASK OUT LOWER NYBBLE
+   2094   fe a0             CP $A0           ; CHECK TO SEE IF HIGH NYBBLE IS A-F
+   2096   c2 43 20          JP NZ,HANDLED    ; IF NOT, THEN CONTINUE
+   2099   3e 00             LD A,0           ; LOAD ACCUMULATOR WITH ZERO
+   209b   dd 77 01          LD (IX+1),A      ; RESET LEFT COUNTER TO ZERO
+   209e   0e 15             LD C,BEEP
+   20a0   cd 30 00          CALL SYSTEM
+   20a3   0e 15             LD C,BEEP
+   20a5   cd 30 00          CALL SYSTEM
+   20a8   c3 43 20          JP HANDLED
+   20ab                 LEFTMINUS:
+   20ab   dd 7e 01          LD A,(IX+1)      ; LOAD ACCUMULATOR WITH LOWER BYTE INTENDED FOR DISPLAY
+   20ae   3d                DEC A            ; INCREMENT LOWER BYTE
+   20af   dd 77 01          LD (IX+1),A      ; SAVE ACCUMULATOR TO LOWER BYTE
+   20b2   e6 0f             AND $0F          ; MASK OUT UPPER NYBBLE
+   20b4   fe 0f             CP $0F           ; CHECK FOR > 0
+   20b6   c2 43 20          JP NZ,HANDLED    ; IF NOT YET $0A, CONTINUE
+   20b9   dd 7e 01          LD A,(IX+1)      ; RELOAD ACCUMULATOR WITH LOWER BYTE
+   20bc   d6 06             SUB 6          ; IF > 9 THEN ADD 6 (COUNT IN DEC)
+   20be   dd 77 01          LD (IX+1),A      ; STORE ACCUMULATOR TO LOWER BYTE
+   20c1   e6 f0             AND $F0          ; MASK OUT LOWER NYBBLE
+   20c3   fe f0             CP $F0           ; CHECK TO SEE IF HIGH NYBBLE IS A-F
+   20c5   c2 43 20          JP NZ,HANDLED    ; IF NOT, THEN CONTINUE
+   20c8   3e 00             LD A,0           ; LOAD ACCUMULATOR WITH ZERO
+   20ca   dd 77 01          LD (IX+1),A      ; RESET LEFT COUNTER TO ZERO
+   20cd   0e 15             LD C,BEEP
+   20cf   cd 30 00          CALL SYSTEM
+   20d2   0e 15             LD C,BEEP
+   20d4   cd 30 00          CALL SYSTEM
+   20d7   c3 43 20          JP HANDLED
+   20da                 RIGHTPLUS:
+   20da   dd 7e 00          LD A,(IX+0)      ; LOAD ACCUMULATOR WITH LOWER BYTE INTENDED FOR DISPLAY
+   20dd   3c                INC A            ; INCREMENT LOWER BYTE
+   20de   dd 77 00          LD (IX+0),A      ; SAVE ACCUMULATOR TO LOWER BYTE
+   20e1   e6 0f             AND $0F          ; MASK OUT UPPER NYBBLE
+   20e3   fe 0a             CP $0A           ; CHECK FOR > 0
+   20e5   c2 43 20          JP NZ,HANDLED  ; IF NOT YET $0A, CONTINUE
+   20e8   dd 7e 00          LD A,(IX+0)      ; RELOAD ACCUMULATOR WITH LOWER BYTE
+   20eb   c6 06             ADD A,6          ; IF > 9 THEN ADD 6 (COUNT IN DEC)
+   20ed   dd 77 00          LD (IX+0),A      ; STORE ACCUMULATOR TO LOWER BYTE
+   20f0   e6 f0             AND $F0          ; MASK OUT LOWER NYBBLE
+   20f2   fe a0             CP $A0           ; CHECK TO SEE IF HIGH NYBBLE IS A-F
+   20f4   c2 43 20          JP NZ,HANDLED  ; IF NOT, THEN CONTINUE
+   20f7   3e 00             LD A,0           ; LOAD ACCUMULATOR WITH ZERO
+   20f9   dd 77 00          LD (IX+0),A      ; RESET LEFT COUNTER TO ZERO
+   20fc   0e 15             LD C,BEEP
+   20fe   cd 30 00          CALL SYSTEM
+   2101   0e 15             LD C,BEEP
+   2103   cd 30 00          CALL SYSTEM
+   2106   c3 43 20          JP HANDLED
+   2109                 RIGHTMINUS:
+   2109   dd 7e 00          LD A,(IX+0)      ; LOAD ACCUMULATOR WITH LOWER BYTE INTENDED FOR DISPLAY
+   210c   3d                DEC A            ; INCREMENT LOWER BYTE
+   210d   dd 77 00          LD (IX+0),A      ; SAVE ACCUMULATOR TO LOWER BYTE
+   2110   e6 0f             AND $0F          ; MASK OUT UPPER NYBBLE
+   2112   fe 0f             CP $0F           ; CHECK FOR > 0
+   2114   c2 43 20          JP NZ,HANDLED    ; IF NOT YET $0A, CONTINUE
+   2117   dd 7e 00          LD A,(IX+0)      ; RELOAD ACCUMULATOR WITH LOWER BYTE
+   211a   d6 06             SUB 6          ; IF > 9 THEN ADD 6 (COUNT IN DEC)
+   211c   dd 77 00          LD (IX+0),A      ; STORE ACCUMULATOR TO LOWER BYTE
+   211f   e6 f0             AND $F0          ; MASK OUT LOWER NYBBLE
+   2121   fe f0             CP $F0           ; CHECK TO SEE IF HIGH NYBBLE IS A-F
+   2123   c2 43 20          JP NZ,HANDLED    ; IF NOT, THEN CONTINUE
+   2126   3e 00             LD A,0           ; LOAD ACCUMULATOR WITH ZERO
+   2128   dd 77 00          LD (IX+0),A      ; RESET LEFT COUNTER TO ZERO
+   212b   0e 15             LD C,BEEP
+   212d   cd 30 00          CALL SYSTEM
+   2130   0e 15             LD C,BEEP
+   2132   cd 30 00          CALL SYSTEM
+   2135   c3 43 20          JP HANDLED
+                        
+   2138                 CLEARCOUNTS:
+   2138   3e 00             LD A,0          ; LOAD ACCUMULATOR WITH 0
+   213a   dd 77 00          LD (IX+0),A     ; CLEAR RIGHT COUNTER
+   213d   dd 77 01          LD (IX+1),A     ; CLEAR LEFT COUNTER
+   2140   0e 15             LD C,BEEP
+   2142   cd 30 00          CALL SYSTEM
+   2145   0e 15             LD C,BEEP    
+   2147   cd 30 00          CALL SYSTEM
+   214a   c3 43 20          JP HANDLED
+                        ; *** END HANDLEKEYS *** 
+                        
+                        
+                        
+                        
+   214d                 KEYVALUE:
+   214d   00 00             DB $00,$00
+                            
+   214f                 COUNTER:
+   214f   00 00 00 00       DB $00,$00,$00,$00
+                            
+                        ; Pasted some code out of the monitor definitions file.
+                        ; This is not the whole file.
+                        ; to obtain the file, visit:
+                        ; https://github.com/crsjones/Southern-Cross-Computer-z80/tree/main/SouthernCrossSBC_Monitor/SCMonitorV18
+                        ;--------------------------------------------
+                        ; S O U T H E R N   C R O S S   M O N I T O R
+                        ;--------------------------------------------
+                        ;
+                        ;  MONITOR DEFINITIONS FILE 
+                        ;  Version 1.8
+                        ;
+                        ; WRITTEN BY CRAIG R. S. JONES
+                        ; MELBOURNE, AUSTRALIA.
+                        ;
+                        ;--------------------
+                        ; SYSTEM CALL NUMBERS
+                        ;--------------------
+                        ;
+                        ;  LD   C,SYSTEM CALL NUMBER
+                        ;  RST  30H
+                        ;
+   0030                 SYSTEM: EQU $30
+   0000                 MAIN:	EQU	0	;RESTART MONITOR
+   0001                 VERS:	EQU	1	;RETURNS MONITOR VERSION
+   0002                 DISADD:	EQU	2	;ADDRESS -> DISPLAY BUFFER
+   0003                 DISBYT:	EQU	3	;DATA -> DISPLAY BUFFER
+   0004                 CLRBUF:	EQU	4	;CLEAR DISPLAY BUFFER
+   0005                 SCAND:  EQU	5	;SCAN DISPLAY
+   0006                 CONBYT:	EQU	6	;BYTE -> DISPLAY CODE
+   0007                 CONVHI:	EQU	7	;HI NYBBLE -> DISPLAY CODE
+   0008                 CONVLO:	EQU	8	;LO NYBBLE - > DISPLAY CODE
+   0009                 SKEYIN:	EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+   000a                 SKEYRL:	EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+   000b                 KEYIN:	EQU	11	;WAIT FOR KEY PRESS
+   000c                 KEYREL:	EQU	12	;WAIT FOR KEY RELEASE
+   000d                 MENU:	EQU	13	;SELECT ENTRY FROM MENU
+   000e                 CHKSUM:	EQU	14	;CALCULATE CHECKSUM
+   000f                 MUL16:	EQU	15	;16 BIT MULTIPLY
+   0010                 RAND:	EQU	16	;GENERATE RANDOM NUMBER
+   0011                 INDEXB:	EQU	17	;INDEX INTO BYTE TABLE
+   0012                 INDEXW:	EQU	18	;INDEX INTO WORD TABLE
+   0013                 MUSIC:	EQU	19	;PLAY MUSIC TABLE
+   0014                 TONE:	EQU	20	;PLAY A NOTE
+   0015                 BEEP:	EQU	21	;KEY ENTRY BEEP
+   0016                 SKATE:	EQU	22	;SCAN 8X8 DISPLAY
+   0017                 TXDATA:	EQU	23	;TRANSMIT SERIAL BYTE
+   0018                 RXDATA:	EQU	24	;RECEIVE SERIAL BYTE
+   0019                 ASCHEX:	EQU	25	;ASCII CODE -> HEX
+   001a                 WWATCH:	EQU	26	;WRITE TO SMART WATCH
+   001b                 RWATCH:	EQU	27	;READ FROM SMART WATCH
+   001c                 ONESEC:	EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+   001d                 RLSTEP:	EQU	29	;RELAY SEQUENCER
+   001e                 DELONE:	EQU	30	;ONE SECOND DELAY LOOP
+   001f                 SCANKEY: EQU	31	;SCAN THE KEYBOARD
+   0020                 INTELH:	EQU	32	;RECEIVE INTEL HEX FILE
+   0021                 SPLIT:	EQU	33	;SEPARATE A BYTE INTO NYBBLES
+   0022                 SNDMSG:	EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+   0023                 BITASC:	EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+   0024                 WRDASC:	EQU	36	;CONVERT A WORD TO ASCII
+   0025                 BYTASC:	EQU	37	;CONVERT A BYTE TO ASCII
+   0026                 NYBASC:	EQU	38	;CONVERT A NYBBLE TO ASCII
+   0027                 PCBTYP:	EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+   0028                 PRNTSZ:	EQU	40	;INLINE SERIAL PRINT STRING
+   0029                 KBDTYP:	EQU	41	;RETURNS KEYBOARD TYPE
+   002a                 UPDATE:	EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+   002b                 VARRAM:	EQU	43	;RETURN BASE VARIABLE ADDRESS
+   002c                 SERINI:	EQU	44	;INITIALISE BIT BANG SERIAL PORT
+   002d                 SCBUG:	EQU	45	;SCBUG SERIAL MONITOR
+                        
+                        ;END OF INCLUDE FILE
+   2153                     END
+0019  ASCHEX        0015  BEEP          2026  BEGIN         0023  BITASC    
+0025  BYTASC        000e  CHKSUM        2138  CLEARCOUNTS    0004  CLRBUF    
+0006  CONBYT        0007  CONVHI        0008  CONVLO        214f  COUNTER   
+001e  DELONE        0002  DISADD        0003  DISBYT        2043  HANDLED   
+0011  INDEXB        0012  INDEXW        2000  INIT          0020  INTELH    
+0029  KBDTYP        000b  KEYIN         000c  KEYREL        2053  KEYS      
+214d  KEYVALUE      20ab  LEFTMINUS     207c  LEFTPLUS      0000  MAIN      
+000d  MENU          000f  MUL16         0013  MUSIC         0026  NYBASC    
+001c  ONESEC        0027  PCBTYP        0028  PRNTSZ        0010  RAND      
+2109  RIGHTMINUS    20da  RIGHTPLUS     001d  RLSTEP        001b  RWATCH    
+0018  RXDATA        0005  SCAND         001f  SCANKEY       002d  SCBUG     
+002c  SERINI        0016  SKATE         0009  SKEYIN        000a  SKEYRL    
+0022  SNDMSG        0021  SPLIT         0030  SYSTEM        0014  TONE      
+0017  TXDATA        002a  UPDATE        002b  VARRAM        0001  VERS      
+0024  WRDASC        001a  WWATCH        
+
