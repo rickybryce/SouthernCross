@@ -9,8 +9,8 @@ If you have an I/O module built, you can use the switches to set the high byte o
 <h2>BinaryOctalHex.asm</h2>
 BinaryOctalHex requires the I/O module, and will display binary on your LED's, Octal and Hex on the display.
 
-<h2>OctalHexOnly.asm</h2>
-OctalHexOnly will display binary and hex values on the display. Use this file if you do not have an I/O Moudle.
+<h2>OctalHex.asm</h2>
+OctalHex will display binary and hex values on the display. Use this file if you do not have an I/O Moudle.
 You can only adjust the delay in the code.<p>
   
 -- Ricky Bryce
