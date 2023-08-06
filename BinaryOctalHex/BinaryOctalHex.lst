@@ -46,85 +46,96 @@
    201a   dd 36 01 00       LD (IX+1),DELAYHIGH ; LOW BYTE DELAY LOOP
    201e   0e 04             LD C,CLRBUF         ; CLEAR THE DISPLAY BUFFER BEFORE WE BEGIN
    2020   f7                RST SYSTEM          ; SYSTEM CALL
+   2021   3e 00             LD A,00H            ; LOAD 0 BACK TO ACCUMULATOR
+   2023   0e 03             LD C,DISBYT         ; DISPLAY 00 ON THE RIGHTMOST DIGITS
+   2025   f7                RST SYSTEM          ; CALL SYSTEM
+   2026   21 00 00          LD HL,00H           ; LOAD 00 TO HL TO DISPLAY ON LEFT 4 DIGITS
+   2029   0e 02             LD C,DISADD         ; ADD 00 TO THE DISPLAY BUFFER
+   202b   f7                RST SYSTEM          ; SYSTEM CALL
+                            
                         
                             
                            
                         ; ** BEGIN MAIN ROUTINE **
-   2021                 BEGIN:
+   202c                 BEGIN:
                         
-   2021   cd 73 20          CALL DELAY          ; START BY RUNNING A DELAY LOOP
-   2024   3a 02 22          LD A,(COUNTER)      ; LOAD A WITH THE COUNTER TO DISPLAY
-   2027   3c                INC A               ; INCREMENT A
-   2028   32 02 22          LD (COUNTER),A      ; THEN STORE A TO THE COUNTER MEMORY LOCATION
-   202b   d3 80             OUT (80H),A         ; SEND THE COUNTER TO THE LEDS
+   202c   cd 7e 20          CALL DELAY          ; START BY RUNNING A DELAY LOOP
+   202f   3a 02 22          LD A,(COUNTER)      ; LOAD A WITH THE COUNTER TO DISPLAY
+   2032   3c                INC A               ; INCREMENT A
+   2033   32 02 22          LD (COUNTER),A      ; THEN STORE A TO THE COUNTER MEMORY LOCATION
+   2036   d3 80             OUT (80H),A         ; SEND THE COUNTER TO THE LEDS
                         
                             ; CONVERT OCTAL
-   202d                 FIRSTCHAR:              ; IF THE FIRST CHARACTER IS 8, WE NEED TO ADD 8
-   202d   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH THE LAST OCTAL VALUE
-   2030   23                INC HL              ; INCREMENT THIS VALUE
-   2031   22 03 22          LD (OCTAL),HL       ; THEN STORE HL BACK TO OCTAL MEMORY LOCATION
-   2034   7d                LD A,L              ; LOAD THE LOW BYTE TO A
-   2035   e6 0f             AND 0FH             ; MASK OUT THE UPPER NYBBLE
-   2037   fe 08             CP 08H              ; COMPARE TO 8
-   2039   20 29             JR NZ,CONT          ; IF NOT 8, THEN WE ARE OK... CONTINUE
-   203b   2a 03 22          LD HL,(OCTAL)       ; IF 8, THEN RELOAD OCTAL MEMORY LOCATION TO HL
-   203e   7d                LD A,L              ; TRANSFER L TO A
-   203f   c6 08             ADD A,08H           ; ADD 8H
-   2041   6f                LD L,A              ; THEN STORE BACK TO L
-   2042   22 03 22          LD (OCTAL),HL       ; NOW STORE HL BACK TO THE OCTAL MEMORY LOCATION
-   2045                 SECCHAR:                ; NEXT, DEAL WITH THE UPPER NYBBLE
-   2045   2a 03 22          LD HL,(OCTAL)       ; LOAD THE VALUE OF OCTAL TO HL
-   2048   7d                LD A,L              ; LOAD L TO A
-   2049   e6 f0             AND 0F0H            ; MASK OUT THE LOWER NYBBLE
-   204b   fe 80             CP 80H              ; SEE IF WE'VE REACHED 80H
-   204d   20 15             JR NZ,CONT          ; IF NOT THEN CONTINUE
-   204f   2e 00             LD L,00H            ; BUT IF SO, LOAD L WITH 00H
-   2051   24                INC H               ; THEN INCREMENT H
-   2052   22 03 22          LD (OCTAL),HL       ; STORE THE VALUE OF HL BACK TO OCTAL
-   2055                 THIRCHAR:               ; NEXT, DEAL WITH THE HIGH BYTE, SINCE WE CAN GO TO 377
-   2055   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH OCTAL
-   2058   7c                LD A,H              ; TRANSFER H TO A
-   2059   fe 04             CP 04H              ; IF IT'S 4, THEN IT'S TOO HIGH
-   205b   c2 64 20          JP NZ,CONT          ; IF NOT THEN WE ARE OK TO CONTINUE
-   205e   3e 00             LD A,00H            ; IF VALUE WAS 4, LOAD 00H TO A
-   2060   67                LD H,A              ; THEN SET H TO ZERO
-   2061   22 03 22          LD (OCTAL),HL       ; HL IS THE NEW OCTAL NUMBER, STORE THIS VALUE TO OCTAL
-   2064                 CONT:
-   2064   0e 02             LD C,DISADD         ; FUNCTION CODE TO ADD VALUE TO DISPLAY
-   2066   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH OCTAL AS REQUIRED BY DISADD
-   2069   f7                RST SYSTEM          ; SYSTEM CALL
-   206a   3a 02 22          LD A,(COUNTER)      ; LOAD A WITH THE COUNTER
-   206d   0e 03             LD C,DISBYT         ; THEN PERFORM A FUNCTION CALL TO DISPLAY THE COUNTER
-   206f   f7                RST SYSTEM          ; SYSTEM CALL TO DISPLAY RIGHTMOST DIGITS
-   2070   c3 21 20          JP BEGIN            ; START OVER
+   2038                 FIRSTCHAR:              ; IF THE FIRST CHARACTER IS 8, WE NEED TO ADD 8
+   2038   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH THE LAST OCTAL VALUE
+   203b   23                INC HL              ; INCREMENT THIS VALUE
+   203c   22 03 22          LD (OCTAL),HL       ; THEN STORE HL BACK TO OCTAL MEMORY LOCATION
+   203f   7d                LD A,L              ; LOAD THE LOW BYTE TO A
+   2040   e6 0f             AND 0FH             ; MASK OUT THE UPPER NYBBLE
+   2042   fe 08             CP 08H              ; COMPARE TO 8
+   2044   20 29             JR NZ,CONT          ; IF NOT 8, THEN WE ARE OK... CONTINUE
+   2046   2a 03 22          LD HL,(OCTAL)       ; IF 8, THEN RELOAD OCTAL MEMORY LOCATION TO HL
+   2049   7d                LD A,L              ; TRANSFER L TO A
+   204a   c6 08             ADD A,08H           ; ADD 8H
+   204c   6f                LD L,A              ; THEN STORE BACK TO L
+   204d   22 03 22          LD (OCTAL),HL       ; NOW STORE HL BACK TO THE OCTAL MEMORY LOCATION
+   2050                 SECCHAR:                ; NEXT, DEAL WITH THE UPPER NYBBLE
+   2050   2a 03 22          LD HL,(OCTAL)       ; LOAD THE VALUE OF OCTAL TO HL
+   2053   7d                LD A,L              ; LOAD L TO A
+   2054   e6 f0             AND 0F0H            ; MASK OUT THE LOWER NYBBLE
+   2056   fe 80             CP 80H              ; SEE IF WE'VE REACHED 80H
+   2058   20 15             JR NZ,CONT          ; IF NOT THEN CONTINUE
+   205a   2e 00             LD L,00H            ; BUT IF SO, LOAD L WITH 00H
+   205c   24                INC H               ; THEN INCREMENT H
+   205d   22 03 22          LD (OCTAL),HL       ; STORE THE VALUE OF HL BACK TO OCTAL
+   2060                 THIRCHAR:               ; NEXT, DEAL WITH THE HIGH BYTE, SINCE WE CAN GO TO 377
+   2060   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH OCTAL
+   2063   7c                LD A,H              ; TRANSFER H TO A
+   2064   fe 04             CP 04H              ; IF IT'S 4, THEN IT'S TOO HIGH
+   2066   c2 6f 20          JP NZ,CONT          ; IF NOT THEN WE ARE OK TO CONTINUE
+   2069   3e 00             LD A,00H            ; IF VALUE WAS 4, LOAD 00H TO A
+   206b   67                LD H,A              ; THEN SET H TO ZERO
+   206c   22 03 22          LD (OCTAL),HL       ; HL IS THE NEW OCTAL NUMBER, STORE THIS VALUE TO OCTAL
+   206f                 CONT:
+   206f   0e 02             LD C,DISADD         ; FUNCTION CODE TO ADD VALUE TO DISPLAY
+   2071   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH OCTAL AS REQUIRED BY DISADD
+   2074   f7                RST SYSTEM          ; SYSTEM CALL
+   2075   3a 02 22          LD A,(COUNTER)      ; LOAD A WITH THE COUNTER
+   2078   0e 03             LD C,DISBYT         ; THEN PERFORM A FUNCTION CALL TO DISPLAY THE COUNTER
+   207a   f7                RST SYSTEM          ; SYSTEM CALL TO DISPLAY RIGHTMOST DIGITS
+   207b   c3 2c 20          JP BEGIN            ; START OVER
                             
                         ; ** END MAIN ROUTINE **
                         
                         
                         ; ** BEGIN DELAY ROUTINE **
-   2073                 DELAY:
-   2073   ed 4b 00 22       LD BC,(DELAYTIME)   ; LOAD BC WITH DELAYTIME
-                        
-   2077                 FINEDELAY:
-   2077   c5                PUSH BC             ; PUSH BC TO STACK (BACKUP)
-   2078   0e 05             LD C,SCAND          ; FUNCTION CODE TO SCAN DISPLAY
-   207a   f7                RST SYSTEM          ; CALL THE SYSTEM
-   207b   c1                POP BC              ; POP BC FROM STACK (RESTORE)
-   207c   0b                DEC BC              ; DECREMENT BC
-   207d   79                LD A,C              ; LOAD A TO C
-   207e   b0                OR B                ; SEE IF WE'VE REACHED ZERO YET
-   207f   c2 77 20          JP NZ,FINEDELAY     ; IF NOT, THEN CONTINUE LOOP
-                        
-                            ; COMMENT OUT THESE TO INSTRUCTIONS IF YOU DO NOT HAVE
+   207e                 DELAY:
+                            ; COMMENT OUT THE NEXT TWO INSTRUCTIONS IF YOU DO NOT HAVE
                             ; AN I/O MODULE
-   2082   db 81             IN A,(81H)          ; LOAD 8 WITH VALUE OF SWITCHES
-   2084   32 01 22          LD (DELAYTIME+1),A   ; STORE THIS TO HIGH BYTE OF DELAY
+   207e   db 81             IN A,(81H)          ; LOAD 8 WITH VALUE OF SWITCHES
+   2080   32 01 22          LD (DELAYTIME+1),A   ; STORE THIS TO HIGH BYTE OF DELAY
                                                     ; THIS WILL SLOW THE LOOP
+                                                    
+   2083   ed 4b 00 22       LD BC,(DELAYTIME)   ; LOAD BC WITH DELAYTIME
+                        
+   2087                 DELAY1:
+   2087   c5                PUSH BC             ; PUSH BC TO STACK (BACKUP)
+   2088   0e 05             LD C,SCAND          ; FUNCTION CODE TO SCAN DISPLAY
+   208a   f7                RST SYSTEM          ; CALL THE SYSTEM
+   208b   c1                POP BC              ; POP BC FROM STACK (RESTORE)
+   208c   0b                DEC BC              ; DECREMENT BC
+   208d   79                LD A,C              ; LOAD A FROM C
+   208e   b0                OR B                ; SEE IF WE'VE REACHED ZERO YET
+   208f   c2 87 20          JP NZ,DELAY1     ; IF NOT, THEN CONTINUE LOOP
                         
                         
-   2087   c9                RET                     ; RETURN TO MAIN
+                        
+                        
+   2092   c9                RET                     ; RETURN TO MAIN
                         
                         ; ** END DELAY ROUTINE **
+                        
+   2093                 SCANDS:                 ; SCAN THE DISPLAYS
                         
                         
                         
@@ -225,20 +236,20 @@
                         
                         ;END OF PARTIAL INCLUDE FILE
    2205                     END
-0019  ASCHEX        0015  BEEP          2021  BEGIN         0023  BITASC    
+0019  ASCHEX        0015  BEEP          202c  BEGIN         0023  BITASC    
 0038  BREAK         0025  BYTASC        000e  CHKSUM        0004  CLRBUF    
-0006  CONBYT        2064  CONT          0007  CONVHI        0008  CONVLO    
-2202  COUNTER       2073  DELAY         0000  DELAYHIGH     0001  DELAYLOW  
-2200  DELAYTIME     001e  DELONE        0002  DISADD        0003  DISBYT    
-2077  FINEDELAY     202d  FIRSTCHAR     0011  INDEXB        0012  INDEXW    
+0006  CONBYT        206f  CONT          0007  CONVHI        0008  CONVLO    
+2202  COUNTER       207e  DELAY         2087  DELAY1        0000  DELAYHIGH 
+0001  DELAYLOW      2200  DELAYTIME     001e  DELONE        0002  DISADD    
+0003  DISBYT        2038  FIRSTCHAR     0011  INDEXB        0012  INDEXW    
 2000  INIT          0020  INTELH        0029  KBDTYP        000b  KEYIN     
 000c  KEYREL        0000  MAIN          000d  MENU          000f  MUL16     
 0013  MUSIC         0026  NYBASC        2203  OCTAL         001c  ONESEC    
 0027  PCBTYP        0028  PRNTSZ        0010  RAND          001d  RLSTEP    
-001b  RWATCH        0018  RXDATA        0005  SCAND         001f  SCANKEY   
-002d  SCBUG         2045  SECCHAR       002c  SERINI        0016  SKATE     
-0009  SKEYIN        000a  SKEYRL        0022  SNDMSG        0021  SPLIT     
-0030  SYSTEM        2055  THIRCHAR      0014  TONE          0017  TXDATA    
-002a  UPDATE        002b  VARRAM        0001  VERS          0024  WRDASC    
-001a  WWATCH        
+001b  RWATCH        0018  RXDATA        0005  SCAND         2093  SCANDS    
+001f  SCANKEY       002d  SCBUG         2050  SECCHAR       002c  SERINI    
+0016  SKATE         0009  SKEYIN        000a  SKEYRL        0022  SNDMSG    
+0021  SPLIT         0030  SYSTEM        2060  THIRCHAR      0014  TONE      
+0017  TXDATA        002a  UPDATE        002b  VARRAM        0001  VERS      
+0024  WRDASC        001a  WWATCH        
 
