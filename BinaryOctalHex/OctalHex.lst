@@ -1,0 +1,255 @@
+                        ; PROGRAM TO DISPLAY OCTAL, HEX AND BINARY
+                        ; YOU WILL NEED AN INPUT MODULE AT 81H, AND AN
+                        ; OUTPUT MODULE AT 80H FOR LEDS AND TIME DELAY
+                        ;
+                        ; If you do not have an I/O display, simply SET
+                        ; DELAYHIGH: EQU  01H
+                        ; AND COMMENT OUT THESE TWO LINES AFTER THE DELAY LOOP:
+                        ;    IN A,(81H)          ; LOAD 8 WITH VALUE OF SWITCHES
+                        ;    LD (DELAYTIME+1),A
+                        
+                        ; SWITCHES AT 81H DETERMINE THE HIGH BYTE OF
+                        ; THE DELAY LOOP
+                        
+                        ; THIS PROGRAM IS FOR THE SOUTHERN CROSS
+                        ; Z80 COMPUTER
+                        
+                        ; V 1.0 -- USING AZ80 ASSEMBLER
+                        ; -- RICKY BRYCE
+                        
+                        ; BE SURE TO CROSSOVER TX/RX IN CABLE
+                        
+   2000                     ORG 2000H       ; PROGRAM STARTS AT 2000H
+                            
+                        ; DEFINE PRESETS FOR DELAY LOOP
+                        ; TO INCREMENT EVERY SECOND (TRIAL AND ERROR)
+                        
+                        ; ** BEGIN HEAD **
+                        ; THESE SETTINGS WILL COARSE ADJUST CLOCK CALIBRATION
+                        ; FOR FINER TUNING USE NOPS IN DELAY LOOP
+   0001                 DELAYLOW: EQU 01H    ; DELAY LOW BYTE START 51H
+   0002                 DELAYHIGH: EQU 02H; 	; DELAY HIGH BYTE START 01H
+                        
+                        ; ** END HEAD **
+                        
+                        
+                        ; ** BEGIN INITIALIZE **    
+   2000                 INIT: ; INITIALIZE REGISTERS AND MEMORY
+   2000   3e 00             LD A,0  ; ZERO ACCUMULATOR
+   2002   dd 21 03 22       LD IX,OCTAL     ; LOAD IX WITH OCTAL MEMORY LOCATION
+   2006   dd 77 00          LD (IX+0),A     ; CLEAR LOW OCTAL BYTE
+   2009   dd 77 01          LD (IX+1),A     ; CLEAR HIGH OCTAL BYTE
+                            ;LD (80H),A      ; WRITE 0 TO THE DISPLAY
+   200c   32 02 22          LD (COUNTER),A  ; START COUNTER AT ZERO
+   200f   dd 21 00 22       LD IX,DELAYTIME ; LOAD IX WITH DELAY TIME MEMORY LOCATION
+   2013   dd 36 00 01       LD (IX+0),DELAYLOW  ; HIGH BYTE DELAY LOOP
+   2017   dd 36 01 02       LD (IX+1),DELAYHIGH ; LOW BYTE DELAY LOOP
+   201b   0e 04             LD C,CLRBUF         ; CLEAR THE DISPLAY BUFFER BEFORE WE BEGIN
+   201d   f7                RST SYSTEM          ; SYSTEM CALL
+   201e   3e 00             LD A,00H            ; LOAD 0 BACK TO ACCUMULATOR
+   2020   0e 03             LD C,DISBYT         ; DISPLAY 00 ON THE RIGHTMOST DIGITS
+   2022   f7                RST SYSTEM          ; CALL SYSTEM
+   2023   21 00 00          LD HL,00H           ; LOAD 00 TO HL TO DISPLAY ON LEFT 4 DIGITS
+   2026   0e 02             LD C,DISADD         ; ADD 00 TO THE DISPLAY BUFFER
+   2028   f7                RST SYSTEM          ; SYSTEM CALL
+                            
+                        
+                            
+                           
+                        ; ** BEGIN MAIN ROUTINE **
+   2029                 BEGIN:
+                        
+   2029   cd 79 20          CALL DELAY          ; START BY RUNNING A DELAY LOOP
+   202c   3a 02 22          LD A,(COUNTER)      ; LOAD A WITH THE COUNTER TO DISPLAY
+   202f   3c                INC A               ; INCREMENT A
+   2030   32 02 22          LD (COUNTER),A      ; THEN STORE A TO THE COUNTER MEMORY LOCATION
+                            ;OUT (80H),A         ; SEND THE COUNTER TO THE LEDS
+                        
+                            ; CONVERT OCTAL
+   2033                 FIRSTCHAR:              ; IF THE FIRST CHARACTER IS 8, WE NEED TO ADD 8
+   2033   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH THE LAST OCTAL VALUE
+   2036   23                INC HL              ; INCREMENT THIS VALUE
+   2037   22 03 22          LD (OCTAL),HL       ; THEN STORE HL BACK TO OCTAL MEMORY LOCATION
+   203a   7d                LD A,L              ; LOAD THE LOW BYTE TO A
+   203b   e6 0f             AND 0FH             ; MASK OUT THE UPPER NYBBLE
+   203d   fe 08             CP 08H              ; COMPARE TO 8
+   203f   20 29             JR NZ,CONT          ; IF NOT 8, THEN WE ARE OK... CONTINUE
+   2041   2a 03 22          LD HL,(OCTAL)       ; IF 8, THEN RELOAD OCTAL MEMORY LOCATION TO HL
+   2044   7d                LD A,L              ; TRANSFER L TO A
+   2045   c6 08             ADD A,08H           ; ADD 8H
+   2047   6f                LD L,A              ; THEN STORE BACK TO L
+   2048   22 03 22          LD (OCTAL),HL       ; NOW STORE HL BACK TO THE OCTAL MEMORY LOCATION
+   204b                 SECCHAR:                ; NEXT, DEAL WITH THE UPPER NYBBLE
+   204b   2a 03 22          LD HL,(OCTAL)       ; LOAD THE VALUE OF OCTAL TO HL
+   204e   7d                LD A,L              ; LOAD L TO A
+   204f   e6 f0             AND 0F0H            ; MASK OUT THE LOWER NYBBLE
+   2051   fe 80             CP 80H              ; SEE IF WE'VE REACHED 80H
+   2053   20 15             JR NZ,CONT          ; IF NOT THEN CONTINUE
+   2055   2e 00             LD L,00H            ; BUT IF SO, LOAD L WITH 00H
+   2057   24                INC H               ; THEN INCREMENT H
+   2058   22 03 22          LD (OCTAL),HL       ; STORE THE VALUE OF HL BACK TO OCTAL
+   205b                 THIRCHAR:               ; NEXT, DEAL WITH THE HIGH BYTE, SINCE WE CAN GO TO 377
+   205b   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH OCTAL
+   205e   7c                LD A,H              ; TRANSFER H TO A
+   205f   fe 04             CP 04H              ; IF IT'S 4, THEN IT'S TOO HIGH
+   2061   c2 6a 20          JP NZ,CONT          ; IF NOT THEN WE ARE OK TO CONTINUE
+   2064   3e 00             LD A,00H            ; IF VALUE WAS 4, LOAD 00H TO A
+   2066   67                LD H,A              ; THEN SET H TO ZERO
+   2067   22 03 22          LD (OCTAL),HL       ; HL IS THE NEW OCTAL NUMBER, STORE THIS VALUE TO OCTAL
+   206a                 CONT:
+   206a   0e 02             LD C,DISADD         ; FUNCTION CODE TO ADD VALUE TO DISPLAY
+   206c   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH OCTAL AS REQUIRED BY DISADD
+   206f   f7                RST SYSTEM          ; SYSTEM CALL
+   2070   3a 02 22          LD A,(COUNTER)      ; LOAD A WITH THE COUNTER
+   2073   0e 03             LD C,DISBYT         ; THEN PERFORM A FUNCTION CALL TO DISPLAY THE COUNTER
+   2075   f7                RST SYSTEM          ; SYSTEM CALL TO DISPLAY RIGHTMOST DIGITS
+   2076   c3 29 20          JP BEGIN            ; START OVER
+                            
+                        ; ** END MAIN ROUTINE **
+                        
+                        
+                        ; ** BEGIN DELAY ROUTINE **
+   2079                 DELAY:
+                            ; COMMENT OUT THE NEXT TWO INSTRUCTIONS IF YOU DO NOT HAVE
+                            ; AN I/O MODULE
+                            ;IN A,(81H)          ; LOAD 8 WITH VALUE OF SWITCHES
+                            ;LD (DELAYTIME+1),A   ; STORE THIS TO HIGH BYTE OF DELAY
+                                                    ; THIS WILL SLOW THE LOOP
+                                                    
+   2079   ed 4b 00 22       LD BC,(DELAYTIME)   ; LOAD BC WITH DELAYTIME
+                        
+   207d                 DELAY1:
+   207d   c5                PUSH BC             ; PUSH BC TO STACK (BACKUP)
+   207e   0e 05             LD C,SCAND          ; FUNCTION CODE TO SCAN DISPLAY
+   2080   f7                RST SYSTEM          ; CALL THE SYSTEM
+   2081   c1                POP BC              ; POP BC FROM STACK (RESTORE)
+   2082   0b                DEC BC              ; DECREMENT BC
+   2083   79                LD A,C              ; LOAD A FROM C
+   2084   b0                OR B                ; SEE IF WE'VE REACHED ZERO YET
+   2085   c2 7d 20          JP NZ,DELAY1     ; IF NOT, THEN CONTINUE LOOP
+                        
+                        
+                        
+                        
+   2088   c9                RET                     ; RETURN TO MAIN
+                        
+                        ; ** END DELAY ROUTINE **
+                        
+   2089                 SCANDS:                 ; SCAN THE DISPLAYS
+                        
+                        
+                        
+                        
+                        ; ** BEGIN FOOTER (DEFINE BYTES (DB)) **
+   2200                     ORG 2200H		; AVOID CROSSING PAGE BOUNDARY
+                            
+                        ; ** BEGIN DATA TABLES (ARRAYS) **
+   2200                 DELAYTIME: 		; FOR DELAY LOOPS
+   2200   00 00             DB 00H,00H 	; THESE WILL BE OVERWRITTEN WITH
+                        				;CONSTANTS DEFINED IN HEADER
+                        				
+   2202                 COUNTER:        ; VALUE TO BE DISPLAYED ON LEDS AND RIGHTMOST 2 DIGITS
+   2202   00                DB 00H
+                        
+   2203                 OCTAL:          ; VALUE TO BE DISPLAYED ON LEFTMOST 4 DIGITS
+   2203   00 00             DB 00H,00H
+                        				
+                        				
+                        				
+                        ; ** END DATA TABLES (ARRAYS) **  
+                        
+                        ; ** END FOOTER (DEFINE BYTES (DB)) **
+                        
+                        ; CREATE LABEL (ALIAS) NAMED SYSTEM FOR MONITOR ENTRY POINT
+   0030                 SYSTEM: EQU 30H
+   0038                 BREAK:  EQU 38H
+                        
+                           
+                        ; Pasted some code out of the monitor definitions file.
+                        ; This is not the whole file.
+                        ; to obtain the file, visit:
+                        ; https://github.com/crsjones/Southern-Cross-Computer-z80/tree/main/SouthernCrossSBC_Monitor/SCMonitorV18
+                        ;--------------------------------------------
+                        ; S O U T H E R N   C R O S S   M O N I T O R
+                        ;--------------------------------------------
+                        ;
+                        ;  MONITOR DEFINITIONS FILE 
+                        ;  Version 1.8
+                        ;
+                        ; WRITTEN BY CRAIG R. S. JONES
+                        ; MELBOURNE, AUSTRALIA.
+                        ;
+                        ;--------------------
+                        ; SYSTEM CALL NUMBERS
+                        ;--------------------
+                        ;
+                        ;  LD   C,SYSTEM CALL NUMBER
+                        ;  RST  30H
+                        ;
+                        
+   0000                 MAIN:	EQU	0	;RESTART MONITOR
+   0001                 VERS:	EQU	1	;RETURNS MONITOR VERSION
+   0002                 DISADD:	EQU	2	;ADDRESS -> DISPLAY BUFFER
+   0003                 DISBYT:	EQU	3	;DATA -> DISPLAY BUFFER
+   0004                 CLRBUF:	EQU	4	;CLEAR DISPLAY BUFFER
+   0005                 SCAND:  EQU	5	;SCAN DISPLAY
+   0006                 CONBYT:	EQU	6	;BYTE -> DISPLAY CODE
+   0007                 CONVHI:	EQU	7	;HI NYBBLE -> DISPLAY CODE
+   0008                 CONVLO:	EQU	8	;LO NYBBLE - > DISPLAY CODE
+   0009                 SKEYIN:	EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+   000a                 SKEYRL:	EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+   000b                 KEYIN:	EQU	11	;WAIT FOR KEY PRESS
+   000c                 KEYREL:	EQU	12	;WAIT FOR KEY RELEASE
+   000d                 MENU:	EQU	13	;SELECT ENTRY FROM MENU
+   000e                 CHKSUM:	EQU	14	;CALCULATE CHECKSUM
+   000f                 MUL16:	EQU	15	;16 BIT MULTIPLY
+   0010                 RAND:	EQU	16	;GENERATE RANDOM NUMBER
+   0011                 INDEXB:	EQU	17	;INDEX INTO BYTE TABLE
+   0012                 INDEXW:	EQU	18	;INDEX INTO WORD TABLE
+   0013                 MUSIC:	EQU	19	;PLAY MUSIC TABLE
+   0014                 TONE:	EQU	20	;PLAY A NOTE
+   0015                 BEEP:	EQU	21	;KEY ENTRY BEEP
+   0016                 SKATE:	EQU	22	;SCAN 8X8 DISPLAY
+   0017                 TXDATA:	EQU	23	;TRANSMIT SERIAL BYTE
+   0018                 RXDATA:	EQU	24	;RECEIVE SERIAL BYTE
+   0019                 ASCHEX:	EQU	25	;ASCII CODE -> HEX
+   001a                 WWATCH:	EQU	26	;WRITE TO SMART WATCH
+   001b                 RWATCH:	EQU	27	;READ FROM SMART WATCH
+   001c                 ONESEC:	EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+   001d                 RLSTEP:	EQU	29	;RELAY SEQUENCER
+   001e                 DELONE:	EQU	30	;ONE SECOND DELAY LOOP
+   001f                 SCANKEY: EQU	31	;SCAN THE KEYBOARD
+   0020                 INTELH:	EQU	32	;RECEIVE INTEL HEX FILE
+   0021                 SPLIT:	EQU	33	;SEPARATE A BYTE INTO NYBBLES
+   0022                 SNDMSG:	EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+   0023                 BITASC:	EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+   0024                 WRDASC:	EQU	36	;CONVERT A WORD TO ASCII
+   0025                 BYTASC:	EQU	37	;CONVERT A BYTE TO ASCII
+   0026                 NYBASC:	EQU	38	;CONVERT A NYBBLE TO ASCII
+   0027                 PCBTYP:	EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+   0028                 PRNTSZ:	EQU	40	;INLINE SERIAL PRINT STRING
+   0029                 KBDTYP:	EQU	41	;RETURNS KEYBOARD TYPE
+   002a                 UPDATE:	EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+   002b                 VARRAM:	EQU	43	;RETURN BASE VARIABLE ADDRESS
+   002c                 SERINI:	EQU	44	;INITIALISE BIT BANG SERIAL PORT
+   002d                 SCBUG:	EQU	45	;SCBUG SERIAL MONITOR
+                        
+                        ;END OF PARTIAL INCLUDE FILE
+   2205                     END
+0019  ASCHEX        0015  BEEP          2029  BEGIN         0023  BITASC    
+0038  BREAK         0025  BYTASC        000e  CHKSUM        0004  CLRBUF    
+0006  CONBYT        206a  CONT          0007  CONVHI        0008  CONVLO    
+2202  COUNTER       2079  DELAY         207d  DELAY1        0002  DELAYHIGH 
+0001  DELAYLOW      2200  DELAYTIME     001e  DELONE        0002  DISADD    
+0003  DISBYT        2033  FIRSTCHAR     0011  INDEXB        0012  INDEXW    
+2000  INIT          0020  INTELH        0029  KBDTYP        000b  KEYIN     
+000c  KEYREL        0000  MAIN          000d  MENU          000f  MUL16     
+0013  MUSIC         0026  NYBASC        2203  OCTAL         001c  ONESEC    
+0027  PCBTYP        0028  PRNTSZ        0010  RAND          001d  RLSTEP    
+001b  RWATCH        0018  RXDATA        0005  SCAND         2089  SCANDS    
+001f  SCANKEY       002d  SCBUG         204b  SECCHAR       002c  SERINI    
+0016  SKATE         0009  SKEYIN        000a  SKEYRL        0022  SNDMSG    
+0021  SPLIT         0030  SYSTEM        205b  THIRCHAR      0014  TONE      
+0017  TXDATA        002a  UPDATE        002b  VARRAM        0001  VERS      
+0024  WRDASC        001a  WWATCH        
+
