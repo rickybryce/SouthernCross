@@ -1,0 +1,124 @@
+                        ; SIMPLE PORT REFLECTOR
+                        ; YOU WILL NEED AN INPUT MODULE AT 81H, AND AN
+                        ; OUTPUT MODULE AT 80H FOR LEDS AND TIME DELAY
+                        ;
+                        ; CHECK BRYCEAUTOMAITON.COM TO BUILD THE I/O MODULE
+                        ;https://bryceautomation.com/index.php/2023/07/31/i-o-module-for-the-southern-cross/
+                        ;
+                        ; SWITCH STATUS WILL BE DEISPLAYED ON THE LIGHTS
+                        
+                        ; THIS PROGRAM IS FOR THE SOUTHERN CROSS
+                        ; Z80 COMPUTER
+                        
+                        ; V 1.0 -- USING AZ80 ASSEMBLER
+                        ; -- RICKY BRYCE
+                        
+                        
+                        
+   2000                     ORG 2000H       ; PROGRAM STARTS AT 2000H
+                            
+                        ; ** BEGIN INITIALIZE **    
+   2000                 INIT: ; INITIALIZE REGISTERS AND MEMORY
+   2000   3e 00             LD A,0  ; ZERO ACCUMULATOR
+   2002   d3 80             OUT (80H),A ; ZERO OUTPUTS
+                        ; ** END INITIALIZE ***
+                               
+                        ; ** BEGIN MAIN ROUTINE **
+   2004                 BEGIN:
+                        
+   2004   db 81             IN A,(81H)
+   2006   d3 80             OUT (80H),A
+   2008   18 fa             JR BEGIN
+                            
+                        ; ** END MAIN ROUTINE **
+                        
+                        ; CREATE LABEL (ALIAS) NAMED SYSTEM FOR MONITOR ENTRY POINT
+   0030                 SYSTEM: EQU 30H
+   0038                 BREAK:  EQU 38H
+                        
+                           
+                        ; Pasted some code out of the monitor definitions file.
+                        ; This is not the whole file.
+                        ; to obtain the file, visit:
+                        ; https://github.com/crsjones/Southern-Cross-Computer-z80/tree/main/SouthernCrossSBC_Monitor/SCMonitorV18
+                        ;--------------------------------------------
+                        ; S O U T H E R N   C R O S S   M O N I T O R
+                        ;--------------------------------------------
+                        ;
+                        ;  MONITOR DEFINITIONS FILE 
+                        ;  Version 1.8
+                        ;
+                        ; WRITTEN BY CRAIG R. S. JONES
+                        ; MELBOURNE, AUSTRALIA.
+                        ;
+                        ;--------------------
+                        ; SYSTEM CALL NUMBERS
+                        ;--------------------
+                        ;
+                        ;  LD   C,SYSTEM CALL NUMBER
+                        ;  RST  30H
+                        ;
+                        
+   0000                 MAIN:	EQU	0	;RESTART MONITOR
+   0001                 VERS:	EQU	1	;RETURNS MONITOR VERSION
+   0002                 DISADD:	EQU	2	;ADDRESS -> DISPLAY BUFFER
+   0003                 DISBYT:	EQU	3	;DATA -> DISPLAY BUFFER
+   0004                 CLRBUF:	EQU	4	;CLEAR DISPLAY BUFFER
+   0005                 SCAND:  EQU	5	;SCAN DISPLAY
+   0006                 CONBYT:	EQU	6	;BYTE -> DISPLAY CODE
+   0007                 CONVHI:	EQU	7	;HI NYBBLE -> DISPLAY CODE
+   0008                 CONVLO:	EQU	8	;LO NYBBLE - > DISPLAY CODE
+   0009                 SKEYIN:	EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+   000a                 SKEYRL:	EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+   000b                 KEYIN:	EQU	11	;WAIT FOR KEY PRESS
+   000c                 KEYREL:	EQU	12	;WAIT FOR KEY RELEASE
+   000d                 MENU:	EQU	13	;SELECT ENTRY FROM MENU
+   000e                 CHKSUM:	EQU	14	;CALCULATE CHECKSUM
+   000f                 MUL16:	EQU	15	;16 BIT MULTIPLY
+   0010                 RAND:	EQU	16	;GENERATE RANDOM NUMBER
+   0011                 INDEXB:	EQU	17	;INDEX INTO BYTE TABLE
+   0012                 INDEXW:	EQU	18	;INDEX INTO WORD TABLE
+   0013                 MUSIC:	EQU	19	;PLAY MUSIC TABLE
+   0014                 TONE:	EQU	20	;PLAY A NOTE
+   0015                 BEEP:	EQU	21	;KEY ENTRY BEEP
+   0016                 SKATE:	EQU	22	;SCAN 8X8 DISPLAY
+   0017                 TXDATA:	EQU	23	;TRANSMIT SERIAL BYTE
+   0018                 RXDATA:	EQU	24	;RECEIVE SERIAL BYTE
+   0019                 ASCHEX:	EQU	25	;ASCII CODE -> HEX
+   001a                 WWATCH:	EQU	26	;WRITE TO SMART WATCH
+   001b                 RWATCH:	EQU	27	;READ FROM SMART WATCH
+   001c                 ONESEC:	EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+   001d                 RLSTEP:	EQU	29	;RELAY SEQUENCER
+   001e                 DELONE:	EQU	30	;ONE SECOND DELAY LOOP
+   001f                 SCANKEY: EQU	31	;SCAN THE KEYBOARD
+   0020                 INTELH:	EQU	32	;RECEIVE INTEL HEX FILE
+   0021                 SPLIT:	EQU	33	;SEPARATE A BYTE INTO NYBBLES
+   0022                 SNDMSG:	EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+   0023                 BITASC:	EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+   0024                 WRDASC:	EQU	36	;CONVERT A WORD TO ASCII
+   0025                 BYTASC:	EQU	37	;CONVERT A BYTE TO ASCII
+   0026                 NYBASC:	EQU	38	;CONVERT A NYBBLE TO ASCII
+   0027                 PCBTYP:	EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+   0028                 PRNTSZ:	EQU	40	;INLINE SERIAL PRINT STRING
+   0029                 KBDTYP:	EQU	41	;RETURNS KEYBOARD TYPE
+   002a                 UPDATE:	EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+   002b                 VARRAM:	EQU	43	;RETURN BASE VARIABLE ADDRESS
+   002c                 SERINI:	EQU	44	;INITIALISE BIT BANG SERIAL PORT
+   002d                 SCBUG:	EQU	45	;SCBUG SERIAL MONITOR
+                        
+                        ;END OF PARTIAL INCLUDE FILE
+   200a                     END
+0019  ASCHEX        0015  BEEP          2004  BEGIN         0023  BITASC    
+0038  BREAK         0025  BYTASC        000e  CHKSUM        0004  CLRBUF    
+0006  CONBYT        0007  CONVHI        0008  CONVLO        001e  DELONE    
+0002  DISADD        0003  DISBYT        0011  INDEXB        0012  INDEXW    
+2000  INIT          0020  INTELH        0029  KBDTYP        000b  KEYIN     
+000c  KEYREL        0000  MAIN          000d  MENU          000f  MUL16     
+0013  MUSIC         0026  NYBASC        001c  ONESEC        0027  PCBTYP    
+0028  PRNTSZ        0010  RAND          001d  RLSTEP        001b  RWATCH    
+0018  RXDATA        0005  SCAND         001f  SCANKEY       002d  SCBUG     
+002c  SERINI        0016  SKATE         0009  SKEYIN        000a  SKEYRL    
+0022  SNDMSG        0021  SPLIT         0030  SYSTEM        0014  TONE      
+0017  TXDATA        002a  UPDATE        002b  VARRAM        0001  VERS      
+0024  WRDASC        001a  WWATCH        
+
