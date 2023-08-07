@@ -1,0 +1,175 @@
+                        ; PROGRAM TO SIMPLY FLASH THE I/O LIGHTS
+                        ; YOU WILL NEED AN INPUT MODULE AT 81H, AND AN
+                        ; OUTPUT MODULE AT 80H FOR LEDS AND TIME DELAY
+                        ;
+                        ; CHECK BRYCEAUTOMAITON.COM TO BUILD THE I/O MODULE
+                        ;https://bryceautomation.com/index.php/2023/07/31/i-o-module-for-the-southern-cross/
+                        ;
+                        ; SWITCHES AT 81H DETERMINE THE HIGH BYTE OF
+                        ; THE DELAY LOOP
+                        
+                        ; THIS PROGRAM IS FOR THE SOUTHERN CROSS
+                        ; Z80 COMPUTER
+                        
+                        ; V 1.0 -- USING AZ80 ASSEMBLER
+                        ; -- RICKY BRYCE
+                        
+                        ; ** BEGIN HEAD **
+                        ; THESE SETTINGS WILL COARSE ADJUST CLOCK CALIBRATION
+                        ; FOR FINER TUNING USE NOPS IN DELAY LOOP
+   00ff                 DELAYLOW: EQU 0FFH   ; DELAY LOW BYTE START 51H
+   0000                 DELAYHIGH: EQU 00; 	; DELAY HIGH BYTE START 01H
+                                            ; THIS WILL BE REPLACED LATER IN THE PROGRAM
+                                            ; BY THE SWITCH SETTINGS
+                        
+                        ; ** END HEAD **
+                        
+   2000                     ORG 2000H       ; PROGRAM STARTS AT 2000H
+                            
+                        ; ** BEGIN INITIALIZE **    
+   2000                 INIT: ; INITIALIZE REGISTERS AND MEMORY
+   2000   3e 00             LD A,0  ; ZERO ACCUMULATOR
+   2002   32 80 00          LD (80H),A      ; WRITE 0 TO THE DISPLAY
+   2005   dd 21 00 21       LD IX,DELAYTIME ; LOAD IX WITH DELAY TIME MEMORY LOCATION
+   2009   dd 36 00 ff       LD (IX+0),DELAYLOW  ; HIGH BYTE DELAY LOOP
+   200d   dd 36 01 00       LD (IX+1),DELAYHIGH ; LOW BYTE DELAY LOOP
+                        ; ** END INITIALIZE ***
+                               
+                        ; ** BEGIN MAIN ROUTINE **
+   2011                 BEGIN:
+                        
+   2011   cd 21 20          CALL DELAY          ; START BY RUNNING A DELAY LOOP
+   2014   3e 00             LD A,00H            ; LOAD A WITH ZERO
+   2016   d3 80             OUT (80H),A         ; SEND A 0r TO THE LEDS
+   2018   cd 21 20          CALL DELAY          ; DELAY ONCE AGAIN
+   201b   3e ff             LD A,0FFH            ; LOAD A WITH THE VALUE OF 1
+   201d   d3 80             OUT (80H),A         ; SEND A 1 TO THE LEDS
+   201f   18 f0             JR BEGIN
+                            
+                        ; ** BEGIN DELAY ROUTINE **
+   2021                 DELAY:
+                            ; THIS IS SIMPLY A DELAY ROUTINE.  IT IS DESTRUCTIVE TO 
+                            ; A AND BC.  THE HIGH BYTE OF THE DELAY LOOP IS RETRIEVED
+                            ; FROM THE SWITCHES AT PORT 81H
+   2021   db 81             IN A,(81H)          ; LOAD 8 WITH VALUE OF SWITCHES
+   2023   32 01 21          LD (DELAYTIME+1),A   ; STORE THIS TO HIGH BYTE OF DELAY
+   2026   ed 4b 00 21       LD BC,(DELAYTIME)   ; LOAD BC WITH DELAYTIME
+                        ; NEST DELAY LOOPS
+   202a                 DELAY1:
+   202a   16 0b             LD D,0BH            ; LOAD A STARTING VALUE TO D... WITHOUT THIS
+                                                ; THE LIGHT WILL BLINK TO FAST FOR LOWER VALUES
+                                                ; OF SWITCHES.
+   202c                 DELAY2:
+   202c   15                DEC D               ; DECREMENT DE FOR INNER LOOP
+   202d   c2 2c 20          JP NZ,DELAY2        ; IF SO, THEN JUMP TO DELAY2
+                            
+   2030   0b                DEC BC              ; DECREMENT BC
+   2031   79                LD A,C              ; LOAD A FROM C
+   2032   b0                OR B                ; SEE IF WE'VE REACHED ZERO YET
+   2033   c2 2a 20          JP NZ,DELAY1     ; IF NOT, THEN CONTINUE LOOP
+   2036   c9                RET                     ; RETURN TO MAIN
+                        ; ** END DELAY ROUTINE **
+                            
+                        ; ** BEGIN FOOTER (DEFINE BYTES (DB)) **
+   2100                     ORG 2100H	; AVOID CROSSING PAGE BOUNDARY
+                            
+                        ; ** BEGIN DATA TABLES (ARRAYS) **
+   2100                 DELAYTIME: 		; FOR DELAY LOOPS
+   2100   00 00             DB 00H,00H 	; THESE WILL BE OVERWRITTEN WITH
+                        				;CONSTANTS DEFINED IN HEADER
+                        ; ** END FOOTER (DEFINE BYTES (DB)) ***
+                        
+                        
+                        ; ** END FOOTER (DEFINE BYTES (DB)) **
+                        
+                        ; CREATE LABEL (ALIAS) NAMED SYSTEM FOR MONITOR ENTRY POINT
+   0030                 SYSTEM: EQU 30H
+   0038                 BREAK:  EQU 38H
+                        
+                           
+                        ; Pasted some code out of the monitor definitions file.
+                        ; This is not the whole file.
+                        ; to obtain the file, visit:
+                        ; https://github.com/crsjones/Southern-Cross-Computer-z80/tree/main/SouthernCrossSBC_Monitor/SCMonitorV18
+                        ;--------------------------------------------
+                        ; S O U T H E R N   C R O S S   M O N I T O R
+                        ;--------------------------------------------
+                        ;
+                        ;  MONITOR DEFINITIONS FILE 
+                        ;  Version 1.8
+                        ;
+                        ; WRITTEN BY CRAIG R. S. JONES
+                        ; MELBOURNE, AUSTRALIA.
+                        ;
+                        ;--------------------
+                        ; SYSTEM CALL NUMBERS
+                        ;--------------------
+                        ;
+                        ;  LD   C,SYSTEM CALL NUMBER
+                        ;  RST  30H
+                        ;
+                        
+   0000                 MAIN:	EQU	0	;RESTART MONITOR
+   0001                 VERS:	EQU	1	;RETURNS MONITOR VERSION
+   0002                 DISADD:	EQU	2	;ADDRESS -> DISPLAY BUFFER
+   0003                 DISBYT:	EQU	3	;DATA -> DISPLAY BUFFER
+   0004                 CLRBUF:	EQU	4	;CLEAR DISPLAY BUFFER
+   0005                 SCAND:  EQU	5	;SCAN DISPLAY
+   0006                 CONBYT:	EQU	6	;BYTE -> DISPLAY CODE
+   0007                 CONVHI:	EQU	7	;HI NYBBLE -> DISPLAY CODE
+   0008                 CONVLO:	EQU	8	;LO NYBBLE - > DISPLAY CODE
+   0009                 SKEYIN:	EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+   000a                 SKEYRL:	EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+   000b                 KEYIN:	EQU	11	;WAIT FOR KEY PRESS
+   000c                 KEYREL:	EQU	12	;WAIT FOR KEY RELEASE
+   000d                 MENU:	EQU	13	;SELECT ENTRY FROM MENU
+   000e                 CHKSUM:	EQU	14	;CALCULATE CHECKSUM
+   000f                 MUL16:	EQU	15	;16 BIT MULTIPLY
+   0010                 RAND:	EQU	16	;GENERATE RANDOM NUMBER
+   0011                 INDEXB:	EQU	17	;INDEX INTO BYTE TABLE
+   0012                 INDEXW:	EQU	18	;INDEX INTO WORD TABLE
+   0013                 MUSIC:	EQU	19	;PLAY MUSIC TABLE
+   0014                 TONE:	EQU	20	;PLAY A NOTE
+   0015                 BEEP:	EQU	21	;KEY ENTRY BEEP
+   0016                 SKATE:	EQU	22	;SCAN 8X8 DISPLAY
+   0017                 TXDATA:	EQU	23	;TRANSMIT SERIAL BYTE
+   0018                 RXDATA:	EQU	24	;RECEIVE SERIAL BYTE
+   0019                 ASCHEX:	EQU	25	;ASCII CODE -> HEX
+   001a                 WWATCH:	EQU	26	;WRITE TO SMART WATCH
+   001b                 RWATCH:	EQU	27	;READ FROM SMART WATCH
+   001c                 ONESEC:	EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+   001d                 RLSTEP:	EQU	29	;RELAY SEQUENCER
+   001e                 DELONE:	EQU	30	;ONE SECOND DELAY LOOP
+   001f                 SCANKEY: EQU	31	;SCAN THE KEYBOARD
+   0020                 INTELH:	EQU	32	;RECEIVE INTEL HEX FILE
+   0021                 SPLIT:	EQU	33	;SEPARATE A BYTE INTO NYBBLES
+   0022                 SNDMSG:	EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+   0023                 BITASC:	EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+   0024                 WRDASC:	EQU	36	;CONVERT A WORD TO ASCII
+   0025                 BYTASC:	EQU	37	;CONVERT A BYTE TO ASCII
+   0026                 NYBASC:	EQU	38	;CONVERT A NYBBLE TO ASCII
+   0027                 PCBTYP:	EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+   0028                 PRNTSZ:	EQU	40	;INLINE SERIAL PRINT STRING
+   0029                 KBDTYP:	EQU	41	;RETURNS KEYBOARD TYPE
+   002a                 UPDATE:	EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+   002b                 VARRAM:	EQU	43	;RETURN BASE VARIABLE ADDRESS
+   002c                 SERINI:	EQU	44	;INITIALISE BIT BANG SERIAL PORT
+   002d                 SCBUG:	EQU	45	;SCBUG SERIAL MONITOR
+                        
+                        ;END OF PARTIAL INCLUDE FILE
+   2102                     END
+0019  ASCHEX        0015  BEEP          2011  BEGIN         0023  BITASC    
+0038  BREAK         0025  BYTASC        000e  CHKSUM        0004  CLRBUF    
+0006  CONBYT        0007  CONVHI        0008  CONVLO        2021  DELAY     
+202a  DELAY1        202c  DELAY2        0000  DELAYHIGH     00ff  DELAYLOW  
+2100  DELAYTIME     001e  DELONE        0002  DISADD        0003  DISBYT    
+0011  INDEXB        0012  INDEXW        2000  INIT          0020  INTELH    
+0029  KBDTYP        000b  KEYIN         000c  KEYREL        0000  MAIN      
+000d  MENU          000f  MUL16         0013  MUSIC         0026  NYBASC    
+001c  ONESEC        0027  PCBTYP        0028  PRNTSZ        0010  RAND      
+001d  RLSTEP        001b  RWATCH        0018  RXDATA        0005  SCAND     
+001f  SCANKEY       002d  SCBUG         002c  SERINI        0016  SKATE     
+0009  SKEYIN        000a  SKEYRL        0022  SNDMSG        0021  SPLIT     
+0030  SYSTEM        0014  TONE          0017  TXDATA        002a  UPDATE    
+002b  VARRAM        0001  VERS          0024  WRDASC        001a  WWATCH    
+
