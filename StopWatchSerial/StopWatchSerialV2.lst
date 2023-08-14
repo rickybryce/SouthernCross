@@ -1,0 +1,501 @@
+                        ; STOPWATCH PROGRAM FOR SOUTHERN CROSS COMPUTER (Z80)
+                        ; VERSION FOR SCNEO ROM WITH SERIAL MODULE
+                        
+                        ; V 1.0 -- USING AZ80 ASSEMBLER
+                        
+                        ; TO ASSEMBLE:  ./az80 StopWatchSerialV1.asm -l StopWatchSerialV1.lst
+                        ;               -o StopWatchSerialV1.hex (all on one command)
+                        
+                        ; -- RICKY BRYCE
+                        
+                        
+   2000                     ORG 2000H       ; ON SOUTHERN CROSS, WE START AT 2000H
+                            
+                        ; DEFINE PRESETS FOR DELAY LOOP
+                        ; TO INCREMENT EVERY SECOND (TRIAL AND ERROR)
+                        
+                        ; ** BEGIN HEAD **
+                        ; THESE SETTINGS WILL COARSE ADJUST CLOCK CALIBRATION
+                        ; FOR FINER TUNING USE NOPS IN DELAY LOOP
+   0049                 DELAYLOW: EQU 49H	    ; 47H  50H IS TOO SLOW  47 TOO FAST
+   0000                 DELAYHIGH: EQU 00H; 	; DELAY HIGH BYTE START 01H WAS 0
+                        ; ** END HEAD **
+                        
+                        ; ** BEGIN INTRO **
+   2000                 INTRO:
+   2000   06 ff             LD B,0FFH       ; START B AT $FF
+   2002   21 02 00          LD HL,0002H     ; TONE DURATION
+   2005                 INTLOOP:
+   2005   3e 3f             LD A,3FH        ; SET A FOR 6 DISPLAYS AT ONCE
+   2007   d3 85             OUT (85H),A     ; THEN TURN THEM ON
+   2009   78                LD A,B          ; LOAD LOOP VALUE TO A
+   200a   d3 84             OUT (84H),A     ; SEND THIS TO THE DISPLAYS
+   200c   0e 14             LD C,TONE       ; THEN SOUND A TONE FOR THIS VALUE
+   200e   f7                RST SYSTEM
+   200f   10 f4             DJNZ INTLOOP
+                        ; ** END INTRO **
+                        
+                        ; ** BEGIN INITIALIZE **    
+   2011                 INIT: ; INITIALIZE REGISTERS AND MEMORY
+   2011   3e 00             LD A,0  ; ZERO ACCUMULATOR
+   2013   11 00 00          LD DE,0 ; NOT USED HERE (CAN HOLD 16 BIT ADDRESSES)
+   2016   21 00 00          LD HL,0 ; 16 BIT REGISTER (FOR MEMORY ADDRESSES)
+   2019   01 00 00          LD BC,0 ; USED FOR DELAYS
+   201c   dd 21 69 20       LD IX,HUNDREDTHS
+   2020   fd 21 02 23       LD IY,MESSAGE
+                        
+   2024   dd 21 00 23       LD IX,DELAYTIME     ; IX AND IY ARE INDEX REGISTERS
+   2028   dd 36 00 49       LD (IX+0),DELAYLOW  ; HIGH BYTE DELAY LOOP
+   202c   dd 36 01 00       LD (IX+1),DELAYHIGH ; LOW BYTE DELAY LOOP
+                        
+                            ; CLEAR WORKSPACE
+   2030   3e 00             LD A,0              ; ZERO THE A REGISTER
+   2032   21 14 23          LD HL,HUNDREDTH     ; IX AND IY ARE INDEX REGISTERS
+   2035   06 05             LD B,5
+   2037                 CLRWRK:
+   2037   77                LD (HL),A         ; ZERO WORKSPACE
+   2038   23                INC HL
+   2039   10 fc             DJNZ CLRWRK
+                        
+                            ; INITIALIZE MESSAGE
+   203b   3e 00             LD A,0
+   203d   21 02 23          LD HL, MESSAGE
+   2040   06 07             LD B, 7
+   2042                 CLRMSG:
+   2042   77                LD (HL),A
+   2043   23                INC HL
+   2044   10 fc             DJNZ CLRMSG
+                        
+                            ; SET UP BACKSPACES
+   2046   3e 08             LD A,8
+   2048   21 0a 23          LD HL,MESSAGE+8
+   204b   06 08             LD B,8 ; BACKSPACES + 1
+   204d                 BACKSPC:
+   204d   77                LD (HL),A
+   204e   23                INC HL
+   204f   10 fc             DJNZ BACKSPC
+                        
+   2051   3e 00             LD A,00H
+   2053   32 12 23          LD (MESSAGE+16),A      ; ZERO TO TERMINATE THE MESSAGE
+   2056   32 13 23          LD (MESSAGE+17),A      ; SPARE
+                        
+                        
+   2059   3e 02             LD A,02H		; MODES: 1=RUN, 2=STOP, 3=RESET
+   205b   32 1b 23          LD (WTMODE),A	; SAVE MODE 2 TO MEMORY
+   205e   3e 00             LD A,00H		; LOAD A WITH 0H
+   2060   32 1d 23          LD (RSTREQ),A	; BE SURE RESET REQUEST IS KILLED
+                        ; ** END INITIALIZE **    
+                           
+                        ; ** BEGIN MAIN ROUTINE **
+   2063                 BEGIN:
+   2063   cd 28 21          CALL SCANDS
+   2066   cd ce 21          CALL DELAY		; DELAY TO CALIBRATE FOR SECONDS
+                        
+   2069                 HUNDREDTHS:
+   2069   dd 7e 00          LD A,(IX+0)	        ; LOAD ACCUMULATOR WITH HUNDREDTHS
+   206c   3c                INC A		        ; INCREMENT LOWER BYTE
+   206d   fe 0a             CP 0AH              ; CHECK FOR 0A
+   206f   28 0a             JR Z,TENTHS         ; IF A, THEN GO TO TENTHS
+   2071   dd 7e 00          LD A,(IX+0)         ; OTHERWISE RELOAD A
+   2074   3c                INC A               ; INCREMENT A
+   2075   dd 77 00          LD (IX+0),A	        ; STORE A TO MEMORY
+   2078   c3 63 20          JP BEGIN            ; THEN GO BACK TO BEGIN
+                        
+   207b                 TENTHS:                 ; TIME TO INCREMENT 10THS
+   207b   3e 00             LD A,0              ; LOAD 0 TO A
+   207d   dd 77 00          LD (IX+0),A         ; PLACE 0 IN HUNDREDTHS PLACE
+   2080   dd 7e 01          LD A,(IX+1)         ; LOAD TENTHS PLACE
+   2083   3c                INC A               ; INCREMENT THENTHS PLACE
+   2084   fe 0a             CP 0AH              ; SEE IF IT'S REACHED A
+   2086   28 0a             JR Z,ONES           ; IF SO, THEN JUMP TO ONES
+   2088   dd 7e 01          LD A,(IX+1)         ; LOAD TENTHS
+   208b   3c                INC A               ; INCREMENT TENTHS
+   208c   dd 77 01          LD (IX+1),A         ; STORE TENTHS
+   208f   c3 63 20          JP BEGIN            ; START OVER
+                        
+   2092                 ONES:                   ; TIME TO INCREMENT ONES
+   2092   3e 00             LD A,0              ; LOAD 0 TO ACCUMULATOR
+   2094   dd 77 01          LD (IX+1),A         ; SET TENTHS TO 0
+   2097   dd 7e 02          LD A,(IX+2)         ; LOAD ONES
+   209a   3c                INC A               ; INCREMENT ONES
+   209b   fe 0a             CP 0AH              ; COMPARE AGAINST A
+   209d   28 0a             JR Z,TENS           ; IF SO, THEN GO TO TENS
+   209f   dd 7e 02          LD A,(IX+2)         ; RELOAD ONES
+   20a2   3c                INC A               ; INCREMENT ONES
+   20a3   dd 77 02          LD (IX+2),A         ; STORE ONES
+   20a6   c3 63 20          JP BEGIN            ; START AGAIN
+                        
+   20a9                 TENS:                   ; TIME TO INCREMENT TENS
+   20a9   3e 00             LD A,0              ; LOAD A WITH 0
+   20ab   dd 77 02          LD (IX+2),A         ; STORE 0 TO ONES
+   20ae   dd 7e 03          LD A,(IX+3)         ; LOAD TENS
+   20b1   3c                INC A               ; INCREMENT TENS
+   20b2   fe 06             CP 06H              ; SEE IF IT'S REACHED A
+   20b4   28 0a             JR Z,MINONES        ; IF SO, THEN GO TO MINUTE ONES
+   20b6   dd 7e 03          LD A,(IX+3)         ; RELOAD TENS
+   20b9   3c                INC A               ; INCREMENT TENS
+   20ba   dd 77 03          LD (IX+3),A         ; STORE TENS
+   20bd   c3 63 20          JP BEGIN            ; START OVER
+                        
+   20c0                 MINONES:
+   20c0   3e 00             LD A,0              ; LOAD A WITH 0
+   20c2   dd 77 03          LD (IX+3),A         ; STORE TO TENS
+   20c5   dd 7e 04          LD A,(IX+4)         ; LOAD MINUTE ONES
+   20c8   3c                INC A               ; INCREMENT MINUTE ONES
+   20c9   fe 0a             CP 0AH              ; SEE IF IT'S REACHED A
+   20cb   28 0a             JR Z,MINTENS        ; IF SO, THEN GO TO MINUTE TENS
+   20cd   dd 7e 04          LD A,(IX+4)         ; RELOAD MINUTE ONES
+   20d0   3c                INC A               ; INCREMENT MINUTE ONES
+   20d1   dd 77 04          LD (IX+4),A         ; STORE MINUTE ONES
+   20d4   c3 63 20          JP BEGIN            ; START OVER
+                        
+   20d7                 MINTENS:
+   20d7   3e 00             LD A,0              ; LOAD ACCUMULATOR WITH 0
+   20d9   dd 77 04          LD (IX+4),A         ; STORE ZERO TO MINUTE ONES
+   20dc   dd 7e 05          LD A,(IX+5)         ; LOAD MINUTE TENS
+   20df   3c                INC A               ; INCREMENT MINUTE TENS
+   20e0   fe 0a             CP 0AH              ; COMPARE TO A
+   20e2   28 0a             JR Z,ZEROALL        ; IF SO, THEN RESET EVERYTHING TO ZERO
+   20e4   dd 7e 05          LD A,(IX+5)         ; RELOAD MINUTE TENS
+   20e7   3c                INC A               ; INCREMENT MINUTE TENS
+   20e8   dd 77 05          LD (IX+5),A         ; STORE MINUTE TENS
+   20eb   c3 63 20          JP BEGIN            ; START OVER
+                        
+   20ee                 ZEROALL:                ; ZERO EVERYTHING
+   20ee   3e 00             LD A,0              ; LOAD 0 TO A
+   20f0   dd 77 00          LD (IX+0),A         ; ZERO HUNDREDTHS
+   20f3   dd 77 01          LD (IX+1),A         ; ZERO TENTHS
+   20f6   dd 77 02          LD (IX+2),A         ; ZERO ONES
+   20f9   dd 77 03          LD (IX+3),A         ; ZERO TENS
+   20fc   dd 77 04          LD (IX+4),A         ; ZERO HUNDREDS
+   20ff   dd 77 05          LD (IX+5),A         ; ZERO THOUSANDS
+   2102   c3 63 20          JP BEGIN            ; START OVER
+                            
+                        ; ** END MAIN ROUTINE **
+                        
+                        ; ** BEGIN CHECK MDOE SUBROUTINE **
+   2105                 MODECHK:  ; MODE 1 = RUN; MODE 2 = STOP (HOLD) ; MODE 3 = RESET
+   2105                 MODE3:
+   2105   3a 1b 23          LD A,(WTMODE)	; LOAD MODE TO A
+   2108   fe 03             CP 03H		    ; IF MODE IS 3, WE NEED TO RESET
+   210a   c2 19 21          JP NZ,MODE2		; IF NOT 3 CHECK FOR MODE 2
+   210d   3e 02             LD A,02H		; LOAD 02H TO THE ACCUMULATOR
+   210f   32 1b 23          LD (WTMODE),A	; SET THE MODE TO HALT (02H)
+   2112   3e 01             LD A,01H		; LOAD 01H TO ACCUMULATOR
+   2114   32 1d 23          LD (RSTREQ),A	; NO REASON TO DELAY IF RESETTING
+   2117   3e 00             LD A,00H		; LOAD 00H TO ACCUMULATOR
+                        
+   2119                 MODE2:
+   2119   cd 6e 21          CALL CHECKKEY	; CHECK FOR KEYPAD INPUT
+                            ;CALL SCANDS		; SCAN THE DISPLAY
+   211c   3a 1b 23          LD A,(WTMODE)	; RELOAD A WITH MODE
+   211f   fe 02             CP 02H		    ; IF MODE IS 2, WE NEED TO HOLD
+   2121   ca 19 21          JP Z, MODE2		; HOLD IN LOOP
+   2124   c3 27 21          JP MODERET		; IF MODE CHANGED, WE CAN RETURN
+                        
+   2127                 MODE1:			    ; IF MODE IS 1, WE DON'T NEED TO DO ANYTHING
+                        
+   2127                 MODERET:
+   2127   c9                RET
+                        ; ** END CHECK MODE SUBROUTINE **
+                            
+                        ; ** BEGIN SCAN DISPLAY ROUTINE **    
+   2128                 SCANDS:			    ; BUILD MESSAGE, AND SEND TO TERMINAL
+   2128   dd 21 14 23       LD IX,HUNDREDTH ; SET UP IX STARTING AT HUNDREDTHS
+   212c   fd 21 02 23       LD IY,MESSAGE   ; SET UP IY WITH MESSAGE ADDERSS
+   2130   dd 7e 05          LD A, (IX+5)    ; HUNDREDTHS
+   2133   c6 30             ADD A,30H       ; CONVERT TO ASCII
+   2135   fd 77 00          LD (IY+0), A    ; STORE TO MESSAGE
+   2138   dd 7e 04          LD A, (IX+4)    ; TENTHS
+   213b   c6 30             ADD A,30H       ; CONVERT TO ASCII
+   213d   fd 77 01          LD (IY+1), A    ; STORE TO MESSAGE
+   2140   dd 7e 03          LD A, (IX+3)    ; ONES
+   2143   c6 30             ADD A,30H       ; CONVERT TO ASCII
+   2145   fd 77 03          LD (IY+3), A    ; STORE TO MESSAGE
+   2148   dd 7e 02          LD A, (IX+2)    ; TENS
+   214b   c6 30             ADD A,30H       ; CONVERT TO ASCII
+   214d   fd 77 04          LD (IY+4), A    ; STORE TO MESSAGE
+   2150   dd 7e 01          LD A, (IX+1)    ; MINUTE ONES
+   2153   c6 30             ADD A,30H       ; CONVERT TO ASCII
+   2155   fd 77 06          LD (IY+6), A    ; STORE TO MESSAGE
+   2158   dd 7e 00          LD A, (IX+0)    ; MINUTE TENS
+   215b   c6 30             ADD A,30H       ; CONVERT TO ASCII
+   215d   fd 77 07          LD (IY+7), A    ; STORE TO MESSAGE
+   2160   fd 36 02 3a       ld (IY+2), 3AH  ; ADD COLON AFTER MINUTES
+   2164   fd 36 05 3a       LD (IY+5), 3AH  ; ADD COLON AFTER SECONDS
+   2168   21 02 23          LD HL,MESSAGE   ; SETUP UP HL WITH MESSAGE ADDRESS
+   216b   0e 22             LD C,SNDMSG     ; FUNCTION CALL TO SEND THE MESSAGE
+   216d   f7                RST SYSTEM      ; CALL THE SYSTEM
+                        
+                        
+                        ; ** END SCAN DISPLAY ROUTINE **
+                        
+                        ; ** BEGIN CHECKKEY ROUTINE TO SEE IF A KEY IS PRESSED **
+   216e                 CHECKKEY:
+   216e   db 86             IN A,(86H)	    	; INPUT FROM KEYPAD AT PORT $86
+   2170   cb 6f             BIT 5,A             ; CHECK STATUS BIT OF KEYPAD
+   2172   c2 7d 21          JP NZ,CHECKKEYCNT1  ; IF KEY PRESSED JUMP OVER RETURN
+   2175   3e 00             LD A,00H		    ; LOAD 0H TO ACCUMULATOR
+   2177   32 1c 23          LD (KEYONS),A 	    ; CLEAR ONE SHOT BIT IF NO KEY PRESSED
+   217a   c3 cd 21          JP CHECKKEYRET      ; IF NO KEY PRESSED, THEN WE RETURN
+   217d                 CHECKKEYCNT1:
+                            ; AT THIS POINT, WE KNOW A KEY WAS PRESSED
+   217d   e6 1f             AND 1FH             ; GET RID OF THE UPPER 3 BITS
+   217f   32 1a 23          LD (KEYVALUE),A     ; STORE THE KEY PRESSED TO KEYVALUE
+   2182   3a 1c 23          LD A,(KEYONS)	    ; LOAD A WITH ONE SHOT VALUE
+   2185   b7                OR A                ; CHECK TO SEE IF IT'S CLEARED
+   2186   c2 cd 21          JP NZ,CHECKKEYRET   ; KEY IS STILL PRESSED FROM BEFORE
+   2189   3a 1a 23          LD A,(KEYVALUE)     ; RESTORE A WITH KEY VALUE
+   218c   fe 12             CP 12H              ; CHECK FOR +
+   218e   c2 9f 21          JP NZ,NOT12H	    ; IF NOT 12H, CHECK FOR 13H
+   2191   cd 04 22          CALL HIGHTONE       ; SOUND HIGH TONE
+   2194   3e 01             LD A,01H		    ; LOAD 01H TO ACCUMULATOR
+   2196   32 1b 23          LD (WTMODE),A	    ; SET MODE TO RUN
+   2199   32 1c 23          LD (KEYONS),A	    ; SET ONE SHOT VALUE HIGH
+   219c   c3 cd 21          JP CHECKKEYRET      ; RETURN FROM SUBROUTINE
+   219f                 NOT12H:
+   219f   3a 1a 23          LD A,(KEYVALUE)     ; RELOAD KEY VALUE INTO A
+   21a2   fe 13             CP 13H              ; CHECK FOR -
+   21a4   c2 b7 21          JP NZ,NOT13H	    ; IF NOT 13, CHECK FOR 0        
+   21a7   cd 12 22          CALL LOWTONE        ; SOUND LOW TONE
+   21aa   3e 02             LD A,02H		    ; LOAD 02H TO ACCUMULATOR
+   21ac   32 1b 23          LD (WTMODE),A  	    ; ENTER HOLD MODE
+   21af   3e 01             LD A,01H		    ; LOAD 01H TO ACCUMULATOR
+   21b1   32 1c 23          LD (KEYONS),A	    ; SET ONE SHOT VALUE HIGH
+   21b4   c3 cd 21          JP CHECKKEYRET      ; RETURN FROM SUBROUTINE
+   21b7                 NOT13H:
+   21b7   3a 1a 23          LD A,(KEYVALUE)	    ; RELOAD KEYVALUE MEMORY TO A
+   21ba   b7                OR A                ; COMPARE A TO 0
+   21bb   c2 c6 21          JP NZ,NOKEY         ; KEY PRESSED IS INVALID
+   21be   3e 03             LD A,03H		    ; LOAD 03H TO ACCUMULATOR MODE=3
+   21c0   32 1b 23          LD (WTMODE),A	    ; ENTER RESET MODE
+   21c3   c3 ca 21          JP WAITKEYRL        ; TIMER PAUSES WHILE PRESSED
+                            
+   21c6                 NOKEY:                  ; KEYPRESS IS INVALID
+   21c6   ff                RST BREAK           ; TROUBLESHOOTING
+   21c7   c3 cd 21          JP CHECKKEYRET      ; RETURN FROM SUBROUTINE
+                            
+   21ca                 WAITKEYRL:
+   21ca   0e 0a             LD C, SKEYRL        ; WAIT FOR KEY RELEASE
+   21cc   f7                RST SYSTEM
+                        
+   21cd                 CHECKKEYRET:
+   21cd   c9                RET     ; RETURN TO NEXT INSTRUCTION AFTER THIS CALL
+                        ; ** END CHECKKEY ROUTINE TO SEE IF A KEY IS PRESSED **
+                        
+                        ; ** BEGIN DELAY ROUTINE
+   21ce                 DELAY:			; DELAY ROUTINE USING BC PAIR
+   21ce   ed 4b 00 23       LD BC,(DELAYTIME)	; SET BC TO DELAYTIME
+   21d2                 DELAY1:
+   21d2   0b                DEC BC		        ; DECREMENT BC PAIR
+   21d3   3e 00             LD A,00H		    ; LOAD ACCUMULATOR WITH ZERO
+   21d5   32 1d 23          LD (RSTREQ),A	    ; CLEAR KILLDELAY REQUEST
+                        
+   21d8   c5                PUSH BC		        ; BC USED BY SUBROUTINES -- BACK IT UP
+   21d9   cd 6e 21          CALL CHECKKEY	    ; CHECK TO SEE IF A KEY IS PRESSED
+   21dc   cd 05 21          CALL MODECHK	    ; CHECK TIMER MODE
+   21df   c1                POP BC		        ; RESTORE BC BEFORE GOING ANYWHERE ELSE
+                        
+   21e0   3a 1d 23          LD A,(RSTREQ)  	    ; CHECK TO SEE IF WE NEED DELAY
+   21e3   b7                OR A              	; SEE IF IT'S OK TO CONTINUE DELAY
+   21e4   ca ea 21          JP Z, CONTDLY1    	; IF SO, CONTINUE
+   21e7   c3 fc 21          JP DELAYRET       	; OTHERWISE, RETURN
+   21ea                 CONTDLY1:
+   21ea   78                LD A,B		; LOAD A WITH HIGH BYTE OF DLY SECOND
+   21eb   b1                OR C		; OR WITH C - CHECK FOR ANY HIGH BITS
+                            
+                            ; NOPS FOR TIME CALIBRATION
+   21ec   00                NOP
+   21ed   00                NOP 
+   21ee   00                NOP
+   21ef   00                NOP 
+   21f0   00                NOP 
+   21f1   00                NOP ; TOO FAST
+                        
+   21f2   00                NOP
+   21f3   00                NOP
+   21f4   00                NOP
+   21f5   00                NOP
+   21f6   00                NOP
+   21f7   00                NOP  ; LITTLE BIT TOO FAST
+                        
+   21f8   00                NOP ;  1/4 SEC EVERY MINUTE FAST
+                        
+   21f9   c2 d2 21          JP NZ,DELAY1	; RE-RUN LOOP
+                                
+                        
+   21fc                 DELAYRET:
+   21fc   c5                PUSH BC
+   21fd   06 07             LD B,07H
+   21ff                 FINEDELAY:
+   21ff   00                NOP
+   2200   10 fd             DJNZ FINEDELAY
+   2202   c1                POP BC
+                        
+   2203   c9                RET ; ALL DONE WITH DELAY ROUTINE
+                        ; ** END DELAY ROUTINE **   
+                        
+                        ; ** BEGIN HIGH TONE **
+   2204                 HIGHTONE:
+   2204   21 75 00      	LD HL,0075H	; TONE DURATION
+   2207   3e 25         	LD A,25H	; TONE PITCH
+   2209   0e 14         	LD C,TONE	; LOAD C WITH TONE FUNCTION CODE
+   220b   f7            	RST SYSTEM	; CALL SYSTEM
+   220c   3e 15         	LD A,15H	; TONE PITCH
+   220e   0e 14         	LD C,TONE	; LOAD C WITH TONE FUNCTION CODE
+   2210   f7            	RST SYSTEM	; CALL SYSTEM
+   2211   c9            	RET
+                        ; ** END HIGH TONE **
+                        
+                        ; ** BEGIN LOW TONE **
+   2212                 LOWTONE:
+   2212   21 25 00      	LD HL,0025H	; TONE DURATION
+   2215   3e 55         	LD A,55H	; TONE PITCH
+   2217   0e 14         	LD C,TONE	; TONE FUNCTION CODE
+   2219   f7            	RST SYSTEM	; CALL SYSTEM
+   221a   3e 75         	LD A,75H	; TONE PITCH
+   221c   0e 14         	LD C,TONE	; TONE FUNCTION CODE
+   221e   f7            	RST SYSTEM	; CALL SYSTEM
+   221f   c9            	RET
+                        ; ** END LOW TONE **
+                        
+                        ; ** BEGIN CLICKTONE **
+   2220                 CLKTONE:    
+   2220   21 15 00      	LD HL,0015H	; TONE DURATION
+   2223   3e 99         	LD A,99H	; TONE PITCH
+   2225   0e 14         	LD C,TONE	; TONE FUNCTION CODE
+   2227   f7            	RST SYSTEM	; CALL SYSTEM
+   2228   c9            	RET
+                        ; ** END CLICKTONE
+                        
+                        ; ** BEGIN FOOTER (DEFINE BYTES (DB)) **
+   2300                     ORG 2300H		; AVOID CROSSING PAGE BOUNDARY
+                            
+                        ; ** BEGIN DATA TABLES (ARRAYS) **
+   2300                 DELAYTIME: 		; FOR DELAY LOOPS
+   2300   ff ff             DB 0FFH,0FFH 	; THESE WILL BE OVERWRITTEN WITH 
+                        				    ;CONSTANTS DEFINED IN HEADER
+                            
+   2302                 MESSAGE: ; DIGITS TO DISPLAY
+   2302   00 00 00 00       DB 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H, 00H    ; MESSAGE TO DISPLAY
+   2306   00 00 00 00   
+   230a   00 00 00 00   
+   230e   00 00 00 00   
+   2312   00 00         
+                        
+   2314                 HUNDREDTH:  ; WORKSPACE STARTING AT HUNDREDTHS
+   2314   00 00 00 00       DB 00H, 00H, 00H, 00H, 00H, 00H
+   2318   00 00         
+                                               
+   231a                 KEYVALUE:           ; STORE KEY VALUE
+   231a   00                DB 00H
+   231b                 WTMODE:			    ; MEMORY LOCATION FOR STOPWATCH MODE
+   231b   00                DB 00H
+   231c                 KEYONS:			    ; MEMORY LOCATION FOR ONE SHOT
+   231c   00                DB 00H
+   231d                 RSTREQ:			    ; MEMORY FLAG FOR RESET REQUEST
+   231d   00                DB 00H
+                        ; ** END DATA TABLES (ARRAYS) **  
+                        
+                        ; ** END FOOTER (DEFINE BYTES (DB)) **
+                        
+                        ; CREATE LABEL (ALIAS) NAMED SYSTEM FOR MONITOR ENTRY POINT
+   0030                 SYSTEM: EQU 30H
+   0038                 BREAK:  EQU 38H
+                        
+                           
+                        ; Pasted some code out of the monitor definitions file.
+                        ; This is not the whole file.
+                        ; to obtain the file, visit:
+                        ; https://github.com/crsjones/Southern-Cross-Computer-z80/tree/main/SouthernCrossSBC_Monitor/SCMonitorV18
+                        ;--------------------------------------------
+                        ; S O U T H E R N   C R O S S   M O N I T O R
+                        ;--------------------------------------------
+                        ;
+                        ;  MONITOR DEFINITIONS FILE 
+                        ;  Version 1.8
+                        ;
+                        ; WRITTEN BY CRAIG R. S. JONES
+                        ; MELBOURNE, AUSTRALIA.
+                        ;
+                        ;--------------------
+                        ; SYSTEM CALL NUMBERS
+                        ;--------------------
+                        ;
+                        ;  LD   C,SYSTEM CALL NUMBER
+                        ;  RST  30H
+                        ;
+                        
+   0000                 MAIN:	EQU	0	;RESTART MONITOR
+   0001                 VERS:	EQU	1	;RETURNS MONITOR VERSION
+   0002                 DISADD:	EQU	2	;ADDRESS -> DISPLAY BUFFER
+   0003                 DISBYT:	EQU	3	;DATA -> DISPLAY BUFFER
+   0004                 CLRBUF:	EQU	4	;CLEAR DISPLAY BUFFER
+   0005                 SCAND:  EQU	5	;SCAN DISPLAY
+   0006                 CONBYT:	EQU	6	;BYTE -> DISPLAY CODE
+   0007                 CONVHI:	EQU	7	;HI NYBBLE -> DISPLAY CODE
+   0008                 CONVLO:	EQU	8	;LO NYBBLE - > DISPLAY CODE
+   0009                 SKEYIN:	EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+   000a                 SKEYRL:	EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+   000b                 KEYIN:	EQU	11	;WAIT FOR KEY PRESS
+   000c                 KEYREL:	EQU	12	;WAIT FOR KEY RELEASE
+   000d                 MENU:	EQU	13	;SELECT ENTRY FROM MENU
+   000e                 CHKSUM:	EQU	14	;CALCULATE CHECKSUM
+   000f                 MUL16:	EQU	15	;16 BIT MULTIPLY
+   0010                 RAND:	EQU	16	;GENERATE RANDOM NUMBER
+   0011                 INDEXB:	EQU	17	;INDEX INTO BYTE TABLE
+   0012                 INDEXW:	EQU	18	;INDEX INTO WORD TABLE
+   0013                 MUSIC:	EQU	19	;PLAY MUSIC TABLE
+   0014                 TONE:	EQU	20	;PLAY A NOTE
+   0015                 BEEP:	EQU	21	;KEY ENTRY BEEP
+   0016                 SKATE:	EQU	22	;SCAN 8X8 DISPLAY
+   0017                 TXDATA:	EQU	23	;TRANSMIT SERIAL BYTE
+   0018                 RXDATA:	EQU	24	;RECEIVE SERIAL BYTE
+   0019                 ASCHEX:	EQU	25	;ASCII CODE -> HEX
+   001a                 WWATCH:	EQU	26	;WRITE TO SMART WATCH
+   001b                 RWATCH:	EQU	27	;READ FROM SMART WATCH
+   001c                 ONESEC:	EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+   001d                 RLSTEP:	EQU	29	;RELAY SEQUENCER
+   001e                 DELONE:	EQU	30	;ONE SECOND DELAY LOOP
+   001f                 SCANKEY: EQU	31	;SCAN THE KEYBOARD
+   0020                 INTELH:	EQU	32	;RECEIVE INTEL HEX FILE
+   0021                 SPLIT:	EQU	33	;SEPARATE A BYTE INTO NYBBLES
+   0022                 SNDMSG:	EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+   0023                 BITASC:	EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+   0024                 WRDASC:	EQU	36	;CONVERT A WORD TO ASCII
+   0025                 BYTASC:	EQU	37	;CONVERT A BYTE TO ASCII
+   0026                 NYBASC:	EQU	38	;CONVERT A NYBBLE TO ASCII
+   0027                 PCBTYP:	EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+   0028                 PRNTSZ:	EQU	40	;INLINE SERIAL PRINT STRING
+   0029                 KBDTYP:	EQU	41	;RETURNS KEYBOARD TYPE
+   002a                 UPDATE:	EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+   002b                 VARRAM:	EQU	43	;RETURN BASE VARIABLE ADDRESS
+   002c                 SERINI:	EQU	44	;INITIALISE BIT BANG SERIAL PORT
+   002d                 SCBUG:	EQU	45	;SCBUG SERIAL MONITOR
+                        
+                        ;END OF PARTIAL INCLUDE FILE
+   231e                     END
+0019  ASCHEX        204d  BACKSPC       0015  BEEP          2063  BEGIN     
+0023  BITASC        0038  BREAK         0025  BYTASC        216e  CHECKKEY  
+217d  CHECKKEYCNT1    21cd  CHECKKEYRET    000e  CHKSUM        2220  CLKTONE   
+0004  CLRBUF        2042  CLRMSG        2037  CLRWRK        0006  CONBYT    
+21ea  CONTDLY1      0007  CONVHI        0008  CONVLO        21ce  DELAY     
+21d2  DELAY1        0000  DELAYHIGH     0049  DELAYLOW      21fc  DELAYRET  
+2300  DELAYTIME     001e  DELONE        0002  DISADD        0003  DISBYT    
+21ff  FINEDELAY     2204  HIGHTONE      2314  HUNDREDTH     2069  HUNDREDTHS
+0011  INDEXB        0012  INDEXW        2011  INIT          0020  INTELH    
+2005  INTLOOP       2000  INTRO         0029  KBDTYP        000b  KEYIN     
+231c  KEYONS        000c  KEYREL        231a  KEYVALUE      2212  LOWTONE   
+0000  MAIN          000d  MENU          2302  MESSAGE       20c0  MINONES   
+20d7  MINTENS       2127  MODE1         2119  MODE2         2105  MODE3     
+2105  MODECHK       2127  MODERET       000f  MUL16         0013  MUSIC     
+21c6  NOKEY         219f  NOT12H        21b7  NOT13H        0026  NYBASC    
+2092  ONES          001c  ONESEC        0027  PCBTYP        0028  PRNTSZ    
+0010  RAND          001d  RLSTEP        231d  RSTREQ        001b  RWATCH    
+0018  RXDATA        0005  SCAND         2128  SCANDS        001f  SCANKEY   
+002d  SCBUG         002c  SERINI        0016  SKATE         0009  SKEYIN    
+000a  SKEYRL        0022  SNDMSG        0021  SPLIT         0030  SYSTEM    
+20a9  TENS          207b  TENTHS        0014  TONE          0017  TXDATA    
+002a  UPDATE        002b  VARRAM        0001  VERS          21ca  WAITKEYRL 
+0024  WRDASC        231b  WTMODE        001a  WWATCH        20ee  ZEROALL   
+
