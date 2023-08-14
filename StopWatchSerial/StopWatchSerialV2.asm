@@ -6,6 +6,9 @@
 ; TO ASSEMBLE:  ./az80 StopWatchSerialV1.asm -l StopWatchSerialV1.lst
 ;               -o StopWatchSerialV1.hex (all on one command)
 
+; + ON THE KEYPAD STARTS THE TIMER.  - WILL PAUSE THE TIMER.
+; 0 ON THE KEYPAD RESETS THE TIMER.
+
 ; -- RICKY BRYCE
 
 
