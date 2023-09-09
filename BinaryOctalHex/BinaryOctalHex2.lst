@@ -1,0 +1,398 @@
+                        ; THIS PROGRAM IS FOR THE SOUTHERN CROSS
+                        ; Z80 COMPUTER BY CRAIG JONES
+                        
+                        ; PROGRAM TO DISPLAY OCTAL, HEX AND BINARY
+                        ; YOU WILL NEED  AN OUTPUT MODULE AT 80H
+                        ; FOR LEDS. V2.0
+                        
+                        ; USE THIS VERSION WITH SCNEO ONLY
+                        ; IF YOU HAVE ACIA FIRMWARE, THEN YOU CAN CHANGE
+                        ; THE OUTPUT PORT TO 83 (HARDWARE AND IN THIS PROGRAM)
+                        ; 
+                        ; IF YOU HAVE ACIA OR SCMON 1.8, THEN ALSO, CHANGE THE 
+                        ; BREAK: EQU 28H TO BREAK: EQU 38H
+                        ;
+                        ; If you do not have an I/O display, you simply won't
+                        ; see the LED Outputs.
+                        
+                        ; OCTAL WILL DISPLAY ON THE FIRST 4 DIGITS, AND HEX ON 
+                        ; THE LAST 2.  LEDS WILL SHOW BINARY.
+                        
+                        
+                        
+                        ; KEYPAD BUTTONS 2-3 SET DELAY (E HIGHEST, 2 LOWEST)
+                        ; BUTTON 1 IS FOR SINGLE STEP, 0 WILL RESET
+                        ; F WILL BREAK TO 28H 
+                        
+                        ; ASSEMBLED USING AZ80 ASSEMBLER
+                        ; https://www.retrotechnology.com/restore/az80.html
+                        ; TO COMPILE IN LINUX (AS PER MARK ABENE)
+                        ; ln -s az80.h AZ80.H ; (OR VICE VERSA)
+                        ; gcc -I. -o az80 az80.c az80util.c az80eval.c
+                        ; THEN CREATE THE FOLLOWING SCRIPT: assemble WITH CONTENTS
+                        
+                        ; -----------------------------------------------------
+                        ; #!/bin/bash
+                        ; ./az80 $1.asm -l $1.lst -o $1.hex
+                        
+                        ; -----------------------------------------------------
+                        ; THEN chmod +x assemble TO MAKE IT EXECUTABLE
+                        ; THEN ./assemble filename  should create your hex file
+                        
+                        ; IN SCNEO, PRESS I, THEN PASTE HEX FILE INTO TERMINAL WITH
+                        ; 1MS LINE DELAY.
+                        ; PRESS G2000 AFTER IT'S LOADED TO RUN THE PROGRAM
+                        
+                        ; -- RICKY BRYCE
+                        
+                        
+                        
+   2000                     ORG 2000H       ; PROGRAM STARTS AT 2000H
+                            
+                        ; DEFINE PRESETS FOR DELAY LOOP
+                        ; TO INCREMENT EVERY SECOND (TRIAL AND ERROR)
+                        
+                        ; ** BEGIN HEAD **
+                        ; THESE SETTINGS WILL COARSE ADJUST CLOCK CALIBRATION
+                        ; FOR FINER TUNING USE NOPS IN DELAY LOOP
+   0000                 DELAYLOW:   EQU 00H     ; DELAY LOW BYTE START 00H
+   0001                 DELAYHIGH:  EQU 01H     ; DELAY HIGH BYTE START 01H
+   0030                 SYSTEM:     EQU 30H     ; FOR SYSTEM CALLS
+   0028                 BREAK:      EQU 28H     ; BREAK POINT
+   0080                 LEDPORT:    EQU 80H     ; PORT FOR LEDS
+                        
+                        ; ** END HEAD **
+                        
+   2000                 PREINIT:
+   2000   dd 21 00 22       LD IX,DELAYTIME ; LOAD IX WITH DELAY TIME MEMORY LOCATION
+   2004   dd 36 00 00       LD (IX+0),DELAYLOW  ; HIGH BYTE DELAY LOOP
+   2008   dd 36 01 01       LD (IX+1),DELAYHIGH ; LOW BYTE DELAY LOOP
+   200c   af                XOR A               ; ZERO ACCUMULATOR
+   200d   32 06 22          LD (ONESHOT),A      ; CLEAR ONESHOT FLAG
+   2010   32 05 22          LD (SINGLESTEP),A   ; CLEAR SINGLESTEP FLAG
+                        
+                        ; ** BEGIN INITIALIZE **    
+   2013                 INIT: ; INITIALIZE REGISTERS AND MEMORY
+   2013   af                XOR A               ; ZERO ACCUMULATOR
+   2014   32 07 22          LD (RESETFLAG),A    ; CLEAR RESET FLAG
+   2017   dd 21 03 22       LD IX,OCTAL         ; LOAD IX WITH OCTAL MEMORY LOCATION
+   201b   dd 77 00          LD (IX+0),A         ; CLEAR LOW OCTAL BYTE
+   201e   dd 77 01          LD (IX+1),A         ; CLEAR HIGH OCTAL BYTE
+   2021   32 02 22          LD (COUNTER),A      ; START COUNTER AT ZERO
+   2024   d3 80             OUT (LEDPORT),A     ;SEND COUNTER TO LEDS
+   2026   0e 04             LD C,CLRBUF         ; CLEAR THE DISPLAY BUFFER BEFORE WE BEGIN
+   2028   f7                RST SYSTEM          ; SYSTEM CALL
+                        
+   2029   0e 03             LD C,DISBYT         ; DISPLAY 00 ON THE RIGHTMOST DIGITS
+   202b   f7                RST SYSTEM          ; CALL SYSTEM
+   202c   21 00 00          LD HL,00H           ; LOAD 00 TO HL TO DISPLAY ON LEFT 4 DIGITS
+   202f   0e 02             LD C,DISADD         ; ADD 00 TO THE DISPLAY BUFFER
+   2031   f7                RST SYSTEM          ; SYSTEM CALL
+   2032   d3 80             OUT (LEDPORT),A     ; SEND COUNTER TO LEDS
+                        
+                        ; ** BEGIN MAIN ROUTINE **
+   2034                 BEGIN:
+   2034   3a 07 22          LD A,(RESETFLAG)    ; CHECK THE RESET FLAG
+   2037   b7                OR A                ; CHECK FOR ZERO (LD DOES NOT ALTER FLAGS)
+   2038   20 d9             JR NZ,INIT          ; RE-INITIALIZE IF RESET FLAG SET
+   203a   3a 05 22          LD A,(SINGLESTEP)   ; LOAD SINGLESTEP FLAG
+   203d   b7                OR A                ; CHECK FOR ZERO (LD DOES NOT ALTER FLAGS)
+   203e   c2 92 20          JP NZ,SST           ; GO TO SINGLE STEP ROUTINE
+   2041                 RSST:                   ; RETURN FROM SINGLESTEP
+   2041   cd a8 20          CALL DELAY          ; START BY RUNNING A DELAY LOOP
+   2044   3a 02 22          LD A,(COUNTER)      ; LOAD A WITH THE COUNTER TO DISPLAY
+   2047   3c                INC A               ; INCREMENT A
+   2048   32 02 22          LD (COUNTER),A      ; THEN STORE A TO THE COUNTER MEMORY LOCATION
+   204b   d3 80             OUT (LEDPORT),A     ; SEND THE COUNTER TO THE LEDS
+                        
+                            ; CONVERT OCTAL
+   204d                 FIRSTCHAR:              ; IF THE FIRST CHARACTER IS 8, WE NEED TO ADD 8
+   204d   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH THE LAST OCTAL VALUE
+   2050   23                INC HL              ; INCREMENT THIS VALUE
+   2051   22 03 22          LD (OCTAL),HL       ; THEN STORE HL BACK TO OCTAL MEMORY LOCATION
+   2054   7d                LD A,L              ; LOAD THE LOW BYTE TO A
+   2055   e6 0f             AND 0FH             ; MASK OUT THE UPPER NYBBLE
+   2057   fe 08             CP 08H              ; COMPARE TO 8
+   2059   20 28             JR NZ,CONT          ; IF NOT 8, THEN WE ARE OK... CONTINUE
+   205b   2a 03 22          LD HL,(OCTAL)       ; IF 8, THEN RELOAD OCTAL MEMORY LOCATION TO HL
+   205e   7d                LD A,L              ; TRANSFER L TO A
+   205f   c6 08             ADD A,08H           ; ADD 8H
+   2061   6f                LD L,A              ; THEN STORE BACK TO L
+   2062   22 03 22          LD (OCTAL),HL       ; NOW STORE HL BACK TO THE OCTAL MEMORY LOCATION
+   2065                 SECCHAR:                ; NEXT, DEAL WITH THE UPPER NYBBLE
+   2065   2a 03 22          LD HL,(OCTAL)       ; LOAD THE VALUE OF OCTAL TO HL
+   2068   7d                LD A,L              ; LOAD L TO A
+   2069   e6 f0             AND 0F0H            ; MASK OUT THE LOWER NYBBLE
+   206b   fe 80             CP 80H              ; SEE IF WE'VE REACHED 80H
+   206d   20 14             JR NZ,CONT          ; IF NOT THEN CONTINUE
+   206f   2e 00             LD L,00H            ; BUT IF SO, LOAD L WITH 00H
+   2071   24                INC H               ; THEN INCREMENT H
+   2072   22 03 22          LD (OCTAL),HL       ; STORE THE VALUE OF HL BACK TO OCTAL
+   2075                 THIRCHAR:               ; NEXT, DEAL WITH THE HIGH BYTE, SINCE WE CAN GO TO 377
+   2075   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH OCTAL
+   2078   7c                LD A,H              ; TRANSFER H TO A
+   2079   fe 04             CP 04H              ; IF IT'S 4, THEN IT'S TOO HIGH
+   207b   c2 83 20          JP NZ,CONT          ; IF NOT THEN WE ARE OK TO CONTINUE
+   207e   af                XOR A               ; IF VALUE WAS 4, LOAD 00H TO A
+   207f   67                LD H,A              ; THEN SET H TO ZERO
+   2080   22 03 22          LD (OCTAL),HL       ; HL IS THE NEW OCTAL NUMBER, STORE THIS VALUE TO OCTAL
+   2083                 CONT:
+   2083   0e 02             LD C,DISADD         ; FUNCTION CODE TO ADD VALUE TO DISPLAY
+   2085   2a 03 22          LD HL,(OCTAL)       ; LOAD HL WITH OCTAL AS REQUIRED BY DISADD
+   2088   f7                RST SYSTEM          ; SYSTEM CALL
+   2089   3a 02 22          LD A,(COUNTER)      ; LOAD A WITH THE COUNTER
+   208c   0e 03             LD C,DISBYT         ; THEN PERFORM A FUNCTION CALL TO DISPLAY THE COUNTER
+   208e   f7                RST SYSTEM          ; SYSTEM CALL TO DISPLAY RIGHTMOST DIGITS
+   208f   c3 34 20          JP BEGIN            ; START OVER
+                            
+                        ; ** END MAIN ROUTINE **
+                        
+                        ; ** SINGLE STEP ROUTINE **
+   2092                 SST:                    ; SIGNLE STEP ROUTINE
+                                                ; WE WON'T DO ONE SHOTS HERE TO ALLOW REPEATS
+                            
+   2092   3e 01             LD A,01H            ; LOAD 1 TO A
+   2094   32 01 22          LD (DELAYTIME+1),A  ; SET DELAYTIME HIGH
+   2097   af                XOR A               ; CLEAR ACCUMULATOR
+   2098   32 00 22          LD (DELAYTIME),A    ; SET DELAYTIME LOW
+                            ;RST BREAK
+   209b   00                NOP
+   209c                 SSTH:                   ; SINGLESTEP HOLD
+                                                ; WE'LL ALLOW ANY KEY HERE AS DELAY WILL
+                                                ; CHANGE MODE IF ANOTHER KEY IS PRESSED
+   209c   0e 05             LD C,SCAND
+   209e   f7                RST SYSTEM
+   209f   db 86             IN A,(86H)          ; LOAD KEYPAD BUFFER
+   20a1   cb 6f             BIT 5,A             ; CHECK BIT 5 (STAUS)
+   20a3   28 f7             JR Z, SSTH           ; HOLD
+   20a5   c3 41 20          JP RSST             ; RETURN TO MAIN
+                        ; ** END SINGLESTEP ROUTINE **
+                        
+                        
+                        ; ** BEGIN DELAY ROUTINE **
+   20a8                 DELAY:
+                            ; COMMENT OUT THE NEXT TWO INSTRUCTIONS IF YOU DO NOT HAVE
+                            ; AN I/O MODULE
+                            ;IN A,(81H)          ; LOAD 8 WITH VALUE OF SWITCHES
+                            
+   20a8   ed 4b 00 22       LD BC,(DELAYTIME)   ; LOAD BC WITH DELAYTIME
+   20ac   ed 43 08 22       LD (DLYLOOP),BC     ; SET LOOP AT CURRENT TIME
+                        
+                        
+   20b0                 DELAY1:
+   20b0   cd c7 20          CALL CHKKEY          ; CHECK FOR KEYPAD VALUE
+                            
+   20b3   c5                PUSH BC             ; PUSH BC TO STACK (BACKUP)
+   20b4   0e 05             LD C,SCAND          ; FUNCTION CODE TO SCAN DISPLAY
+   20b6   f7                RST SYSTEM          ; CALL THE SYSTEM
+   20b7   c1                POP BC              ; POP BC FROM STACK (RESTORE)
+   20b8   ed 4b 08 22       LD BC,(DLYLOOP)     ; LOAD BC FROM CURRENT DELAY VALUE
+   20bc   0b                DEC BC              ; DECREMENT BC
+   20bd   ed 43 08 22       LD (DLYLOOP),BC     ; STORE THE NEW VALUE TO MEMORY
+   20c1   79                LD A,C              ; LOAD A FROM C
+   20c2   b0                OR B                ; SEE IF WE'VE REACHED ZERO YET
+   20c3   c2 b0 20          JP NZ,DELAY1        ; IF NOT, THEN CONTINUE LOOP
+   20c6   c9                RET                 ; RETURN TO MAIN
+                        ; ** END DELAY ROUTINE **
+                        
+                        ; ** CHECKKEYS ROUTINE **
+                        ; CHECK THE STATUS OF THE BUTTONS TO GET THE DELAYTIME,
+                        ; SINGLE STEP MODE (1), OR RESET (0).
+   20c7                 CHKKEY:
+   20c7   3a 06 22          LD  A,(ONESHOT)      ; SEE IF A KEY IS STILL PRESSED
+   20ca   b7                OR A
+   20cb   20 50             JR  NZ,CHKONS       ; CHECK FOR KEY RELEASE TO CLEAR ONS
+   20cd   db 86             IN A,(86H)          ; GET THE KEYPAD BUFFER
+   20cf   cb 6f             BIT 5,A             ; SEE IF A KEY WAS PRESSED
+   20d1   28 35             JR Z,NOKEY          ; RETURN IF NO KEYPRESS
+   20d3   e6 0f             AND 0FH             ; CLEAR UPPER BITS
+   20d5   b7                OR A                ; CHECK A FOR ZERO
+   20d6   28 37             JR Z,ZEROKEY        ; SET RESET FLAG
+   20d8   fe 01             CP 01H              ; CHECK A FOR ONEKEY
+   20da   28 3a             JR Z, ONEKEY        ; SET SINGLESTEP FLAG
+   20dc   fe 0f             CP 0FH
+   20de   28 48             JR Z,SYSBREAK
+                            
+                            ; THE FOLLOWING STATEMENTS ADJUST THE DELAY VALUE FOR 
+                            ; TIMES THAT ARE MORE USEFUL
+                        
+   20e0   32 01 22          LD (DELAYTIME+1),A  ; SET UPPER BYTE OF DELAY
+   20e3   af                XOR A               ; SET A TO 0
+   20e4   32 00 22          LD (DELAYTIME),A    ; STORE ZERO TO LOW BYTE OF DELAYTIME
+                                                ; THIS WILL SLOW THE LOOP WITH MORE OF A TIME SPREAD
+   20e7   2a 00 22          LD HL,(DELAYTIME)   ; LOAD DELAYTIME VALUE TO HL
+   20ea   cb 3c             SRL H               ; SHIFT RIGHT H
+   20ec   cb 1d             RR L                ; ROTATE RIGHT L
+   20ee   cb 3c             SRL H               ; SHIFT RIGHT H
+   20f0   cb 1d             RR L                ; ROTATE RIGHT L
+   20f2   22 00 22          LD (DELAYTIME),HL   ; UPDATE DELAYTIME
+                        
+                            ; UPDATE CURRENT LOOP TIME
+   20f5   ed 4b 00 22       LD BC,(DELAYTIME)   ; START OVER WITH NEW DELAYTIME
+   20f9   ed 43 08 22       LD (DLYLOOP),BC     ; UPDATE CURRENT DLY LOOP TIME
+                            
+                            
+                            ; SET BITS
+   20fd   3e 01             LD A,01H            ; LOAD 1 TO ACCUMULATOR
+   20ff   32 06 22          LD (ONESHOT),A      ; SET THE ONE SHOT FLAG
+   2102   af                XOR A               ; CLEAR ACCUMULATOR
+   2103   32 05 22          LD (SINGLESTEP),A   ; CLEAR SINGLESTEP FLAG 
+                                ;(DIFFERENT KEY PRESSED IF WE GOT HERE)
+                        
+   2106   18 1f             JR CHKKEYRET        ; RETURN FROM SUBROUTINE
+                        
+   2108                 NOKEY:                  ; NO KEY PRESSED
+   2108   af                XOR A               ; ZERO ACCUMULATOR
+   2109   32 06 22          LD (ONESHOT),A      ; CLEAR ONESHOT
+   210c   c3 27 21          JP CHKKEYRET        ; RETURN
+                        
+   210f                 ZEROKEY:
+   210f   3e 01             LD A,01H            ; LOAD ACCUMULATOR WITH 1
+   2111   32 07 22          LD (RESETFLAG),A  ; SET RESET FLAG
+   2114   18 11             JR CHKKEYRET
+   2116                 ONEKEY:
+   2116   3e 01             LD A,01H
+   2118   32 05 22          LD (SINGLESTEP),A   ; SET SINGLESTEP MODE
+                            
+   211b   18 0a             JR CHKKEYRET
+   211d                 CHKONS:
+   211d   db 86             IN A,(86H)          ; CHECK FOR INPUTS
+   211f   cb 6f             BIT 5,A             ; CHECK FOR STATUS BIT
+   2121   20 04             JR NZ, CHKKEYRET    ; IF KEY STILL PRESSED, RETURN
+   2123   af                XOR A               ; OTHERWISE, ZERO ACCUMULATOR
+   2124   32 06 22          LD (ONESHOT),A      ; AND CLEAR ONE SHOT
+                            
+                        
+   2127                 CHKKEYRET:
+   2127   c9                RET
+                            
+   2128                 SYSBREAK:
+   2128   ef                RST BREAK
+                        
+                        
+                        
+                        ; ** END CHECKKEYS ROUTINE
+                        
+                        
+                        ; ** BEGIN FOOTER (DEFINE BYTES (DB)) **
+   2200                     ORG 2200H		; AVOID CROSSING PAGE BOUNDARY
+                            
+                        ; ** BEGIN DATA TABLES (ARRAYS) **
+   2200                 DELAYTIME: 		; FOR DELAY LOOPS
+   2200   00 00             DB 00H,00H 	; THESE WILL BE OVERWRITTEN WITH
+                        				;CONSTANTS DEFINED IN HEADER
+   2202                 COUNTER:        ; VALUE TO BE DISPLAYED ON LEDS AND RIGHTMOST 2 DIGITS
+   2202   00                DB 00H
+   2203                 OCTAL:          ; VALUE TO BE DISPLAYED ON LEFTMOST 4 DIGITS
+   2203   00 00             DB 00H,00H
+   2205                 SINGLESTEP:     ; SINGLE STEP FLAG
+   2205   00                DB 00H
+   2206                 ONESHOT:        ; ONE SHOT FLAG FOR BUTTONS
+   2206   00                DB 00H
+   2207                 RESETFLAG:      ; RESET FLAG
+   2207   00                DB 00H
+   2208                 DLYLOOP:        ; CURRENT DELAY VALUE
+   2208   00 00             DB 00H, 00H
+                        				
+                        				
+                        				
+                        ; ** END DATA TABLES (ARRAYS) **  
+                        
+                        ; ** END FOOTER (DEFINE BYTES (DB)) **
+                        
+                        ; CREATE LABEL (ALIAS) NAMED SYSTEM FOR MONITOR ENTRY POINT
+                        
+                        
+                           
+                        ; Pasted some code out of the monitor definitions file.
+                        ; This is not the whole file.
+                        ; to obtain the file, visit:
+                        ; https://github.com/crsjones/Southern-Cross-Computer-z80/tree/main/SouthernCrossSBC_Monitor/SCMonitorV18
+                        ;--------------------------------------------
+                        ; S O U T H E R N   C R O S S   M O N I T O R
+                        ;--------------------------------------------
+                        ;
+                        ;  MONITOR DEFINITIONS FILE 
+                        ;  Version 1.8
+                        ;
+                        ; WRITTEN BY CRAIG R. S. JONES
+                        ; MELBOURNE, AUSTRALIA.
+                        ;
+                        ;--------------------
+                        ; SYSTEM CALL NUMBERS
+                        ;--------------------
+                        ;
+                        ;  LD   C,SYSTEM CALL NUMBER
+                        ;  RST  30H
+                        ;
+                        
+   0000                 MAIN:	EQU	0	;RESTART MONITOR
+   0001                 VERS:	EQU	1	;RETURNS MONITOR VERSION
+   0002                 DISADD:	EQU	2	;ADDRESS -> DISPLAY BUFFER
+   0003                 DISBYT:	EQU	3	;DATA -> DISPLAY BUFFER
+   0004                 CLRBUF:	EQU	4	;CLEAR DISPLAY BUFFER
+   0005                 SCAND:  EQU	5	;SCAN DISPLAY
+   0006                 CONBYT:	EQU	6	;BYTE -> DISPLAY CODE
+   0007                 CONVHI:	EQU	7	;HI NYBBLE -> DISPLAY CODE
+   0008                 CONVLO:	EQU	8	;LO NYBBLE - > DISPLAY CODE
+   0009                 SKEYIN:	EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+   000a                 SKEYRL:	EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+   000b                 KEYIN:	EQU	11	;WAIT FOR KEY PRESS
+   000c                 KEYREL:	EQU	12	;WAIT FOR KEY RELEASE
+   000d                 MENU:	EQU	13	;SELECT ENTRY FROM MENU
+   000e                 CHKSUM:	EQU	14	;CALCULATE CHECKSUM
+   000f                 MUL16:	EQU	15	;16 BIT MULTIPLY
+   0010                 RAND:	EQU	16	;GENERATE RANDOM NUMBER
+   0011                 INDEXB:	EQU	17	;INDEX INTO BYTE TABLE
+   0012                 INDEXW:	EQU	18	;INDEX INTO WORD TABLE
+   0013                 MUSIC:	EQU	19	;PLAY MUSIC TABLE
+   0014                 TONE:	EQU	20	;PLAY A NOTE
+   0015                 BEEP:	EQU	21	;KEY ENTRY BEEP
+   0016                 SKATE:	EQU	22	;SCAN 8X8 DISPLAY
+   0017                 TXDATA:	EQU	23	;TRANSMIT SERIAL BYTE
+   0018                 RXDATA:	EQU	24	;RECEIVE SERIAL BYTE
+   0019                 ASCHEX:	EQU	25	;ASCII CODE -> HEX
+   001a                 WWATCH:	EQU	26	;WRITE TO SMART WATCH
+   001b                 RWATCH:	EQU	27	;READ FROM SMART WATCH
+   001c                 ONESEC:	EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+   001d                 RLSTEP:	EQU	29	;RELAY SEQUENCER
+   001e                 DELONE:	EQU	30	;ONE SECOND DELAY LOOP
+   001f                 SCANKEY: EQU	31	;SCAN THE KEYBOARD
+   0020                 INTELH:	EQU	32	;RECEIVE INTEL HEX FILE
+   0021                 SPLIT:	EQU	33	;SEPARATE A BYTE INTO NYBBLES
+   0022                 SNDMSG:	EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+   0023                 BITASC:	EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+   0024                 WRDASC:	EQU	36	;CONVERT A WORD TO ASCII
+   0025                 BYTASC:	EQU	37	;CONVERT A BYTE TO ASCII
+   0026                 NYBASC:	EQU	38	;CONVERT A NYBBLE TO ASCII
+   0027                 PCBTYP:	EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+   0028                 PRNTSZ:	EQU	40	;INLINE SERIAL PRINT STRING
+   0029                 KBDTYP:	EQU	41	;RETURNS KEYBOARD TYPE
+   002a                 UPDATE:	EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+   002b                 VARRAM:	EQU	43	;RETURN BASE VARIABLE ADDRESS
+   002c                 SERINI:	EQU	44	;INITIALISE BIT BANG SERIAL PORT
+   002d                 SCBUG:	EQU	45	;SCBUG SERIAL MONITOR
+                        
+                        ;END OF PARTIAL INCLUDE FILE
+   220a                     END
+0019  ASCHEX        0015  BEEP          2034  BEGIN         0023  BITASC    
+0028  BREAK         0025  BYTASC        20c7  CHKKEY        2127  CHKKEYRET 
+211d  CHKONS        000e  CHKSUM        0004  CLRBUF        0006  CONBYT    
+2083  CONT          0007  CONVHI        0008  CONVLO        2202  COUNTER   
+20a8  DELAY         20b0  DELAY1        0001  DELAYHIGH     0000  DELAYLOW  
+2200  DELAYTIME     001e  DELONE        0002  DISADD        0003  DISBYT    
+2208  DLYLOOP       204d  FIRSTCHAR     0011  INDEXB        0012  INDEXW    
+2013  INIT          0020  INTELH        0029  KBDTYP        000b  KEYIN     
+000c  KEYREL        0080  LEDPORT       0000  MAIN          000d  MENU      
+000f  MUL16         0013  MUSIC         2108  NOKEY         0026  NYBASC    
+2203  OCTAL         2116  ONEKEY        001c  ONESEC        2206  ONESHOT   
+0027  PCBTYP        2000  PREINIT       0028  PRNTSZ        0010  RAND      
+2207  RESETFLAG     001d  RLSTEP        2041  RSST          001b  RWATCH    
+0018  RXDATA        0005  SCAND         001f  SCANKEY       002d  SCBUG     
+2065  SECCHAR       002c  SERINI        2205  SINGLESTEP    0016  SKATE     
+0009  SKEYIN        000a  SKEYRL        0022  SNDMSG        0021  SPLIT     
+2092  SST           209c  SSTH          2128  SYSBREAK      0030  SYSTEM    
+2075  THIRCHAR      0014  TONE          0017  TXDATA        002a  UPDATE    
+002b  VARRAM        0001  VERS          0024  WRDASC        001a  WWATCH    
+210f  ZEROKEY       
+
