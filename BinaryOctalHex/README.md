@@ -1,5 +1,8 @@
 <h1>Binary, Octal, and Hex Counter</h1>
 This program will display Octal on the first 4 digits of the Southern Cross display.  Hexadecimal will be displayed on the rightmost two digits of the display.  
+<p>OctalHex -- Requires no I/O Module, but you will not have a binary output.</p> 
+<p>BinaryOctalHex -- This file uses the switches for your delay.</p>
+<p>BinaryOctalHex2 -- Uses keypad buttons instead of switches, and described below</p>
 If you have an I/O module built, set the output address to 80h.  This is for SCNEO firmware, so if you have the ACIA firmware, you will need to change this to an unused port.  Additionally, the F key will perofrm a system break, which is RST 28H in SCNEO.  In other versions, this would be 38h.  The port settings are in the head of the asm file.  After a change, you will have to re-assemble to generate a new hex file with your changes.</p>
 <p>This program uses the keypad on the Southern Cross. </p>
 <ul>
