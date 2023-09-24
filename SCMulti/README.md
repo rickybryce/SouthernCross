@@ -18,6 +18,7 @@ you will need to build an I/O Module running on port 80H (outputs) and 81H (Inpu
   <li>Switch 6 -- When in Binary Counter Mode with Switch 1, this will pause the counter.</li>
   <li>Switch 7 -- When in Binary Counter Mode with Switch 1, this will reset the counter  When in Simple Counter mode with Switch 3, Switch 7 increments the counter.</li>
 </ul>
+<p> Be sure to shut all switches off for about 1 second before choosing a different function.</p>
 <p>If you use Z80ASM by SLR systems, simply rename the SCMULTI.ASM file to SCMULTI.Z80.  To assemble:  Z80ASM SCMULTI/H (Assuming all files are on the same drive as Z80ASM)</p>
 
 <p>--Ricky Bryce</p>
