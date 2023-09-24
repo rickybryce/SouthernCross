@@ -59,7 +59,8 @@ LCDTEST Z80
    56 201F  3E 80           LD A,LINE0
    57 2021  D3 50           OUT (CPORT),A ; SET FIRST LINE
    58 2023  CD 205F         CALL LCDWAIT
-Z80ASM SuperFast Relocating Macro Assembler     	    Z80ASM 1.32 Page   2
+
+Z80ASM SuperFast Relocating Macro Assembler     	    Z80ASM 1.32 Page   2
 LCDTEST Z80
 
    59 2026  CD 2051         CALL WRCHARS
@@ -118,16 +119,18 @@ LCDTEST Z80
   112 2075              SECONDLINE:
   113 2075  20 20 20 5A     DB "   Z80 Computer$"
   114 2085              THIRDLINE:
-  115 2085  20 20 20 20     DB "      64k RAM/ROM$"
+  115 2085  20 20 20 20     DB "      20x4 Display$"
   116 2097              FOURTHLINE:
-Z80ASM SuperFast Relocating Macro Assembler     	    Z80ASM 1.32 Page   3
+
+Z80ASM SuperFast Relocating Macro Assembler     	    Z80ASM 1.32 Page   3
 LCDTEST Z80
 
-  117 2097  52 69 63 6B     DB "Ricky Bryce$"
+  117 2097  52 69 63 6B     DB "Ports 50 and 51$"
   118                   ;** END FOOT **
   119                   
   120                       END
  0 Error(s) Detected.
  163 Absolute Bytes. 14 Symbols Detected.
-TINE **
+
+TINE **
    98                
