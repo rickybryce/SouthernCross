@@ -6,19 +6,19 @@
 ; LCD IS ADDRESS 50H COMMAND / 51H DATA
 
 
-; ASSEMBLED USING A80 ASSEMBLER
+; ASSEMBLED USING AZ80 ASSEMBLER
 ; https://www.retrotechnology.com/
 ; TO COMPILE IN LINUX (AS PER MARK ABENE)
-; ln -s a65.h A80.H ; (OR VICE VERSA)
-; gcc -I. -o a65 a80.c a80util.c a80eval.c
-; THEN CREATE THE FOLLOWING SCRIPT: ASM18 WITH CONTENTS
+; ln -s az80.h AZ80.H ; (OR VICE VERSA)
+; gcc -I. -o az80 az80.c az80util.c az80eval.c
+; THEN CREATE THE FOLLOWING SCRIPT: asmz80 WITH CONTENTS
 
 ; -----------------------------------------------------
 ; #!/bin/bash
-; ./a80 $1.asm -l $1.lst -o $1.hex
+; ./az80 $1.asm -l $1.lst -o $1.hex
 
 ; -----------------------------------------------------
-; THEN chmod +x ASM80 TO MAKE IT EXECUTABLE
+; THEN chmod +x asmz80 TO MAKE IT EXECUTABLE
 ;
 ; IF YOU  USE Z80ASM BY SLR SYSTEMS:
 ; Z80ASM LCDTEST/H
